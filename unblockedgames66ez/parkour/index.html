@@ -1,0 +1,3544 @@
+<!DOCTYPE html>
+<!-- 
+
+my best time is lol ------- 350.84
+
+
+Use Q to sprint, SHIFT to crouch
+
+Programming a parkour mode
+
+DONE:
+ - remove buttons on menu
+ - remove flying
+ - removed placing/breaking
+ - removed hotbar
+ - removed inventory
+ - set spawn properly
+ - made shadows more noticable
+ - added flashlight
+ - made blocks appear darker
+ - update shaders
+ - update checkpoints
+ - add grass=lava
+ - add a timer
+ - removed spectator mode
+ - removed noise library
+
+TODO:
+ - add screen effects
+
+-->
+
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>Super Ultra Duper Hard Parkour *NEW LEVEL, BALANCE CHANGES*</title>
+	</head>
+	<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+	<style>
+		body {
+			overflow: hidden; /* Hide scrollbars */
+		}
+	</style>
+	<body>
+		<canvas id="overlay" tabindex="0" width="600" height="600" style="position: absolute; top: 0px; left: 0px"></canvas>
+		<textarea id="savebox" hidden="true" spellcheck="false" style="position: absolute; top: 10px; left: 10px; z-index: 1;"></textarea>
+		<p id="savedirections" hidden="true" style="position: absolute; top: 40px; left: 10px; z-index: 1; background-color: rgba(255, 255, 255, 0.3);">
+			To save your world, copy/paste the saveString<br>
+			from this box into the code on line 112.<br>
+			var loadString = "Your Code Here";<br>
+			Then save the program as a Spin-off.
+		</p>
+	</body>
+	<!-- Vertex shader -->
+	<script id="vertex-shader" type="shader/vertex">
+		varying float vShadow;
+		attribute vec3 aVertex;
+		attribute vec2 aTexture;
+		attribute float aShadow;
+		
+		varying vec2 vTexture;
+		varying float vDepth;
+		varying float vFlashlight;
+		
+		uniform vec4 uColor;
+		uniform mat4 uView;
+		uniform mat4 uProjection;
+		uniform bool uEdge;
+		
+		uniform vec3 uCamera;
+		
+		vec3 dir = (vec4(1.0, 0.0, 0.0, 1.0)).xyz;
+		
+		void main(void) {
+			vTexture = aTexture;
+			vShadow = aShadow > 0.0 ? aShadow : 1.0;
+			
+			
+			
+			gl_Position = uView * vec4( aVertex, 1.0 );
+			vDepth = length(gl_Position.xyz);
+			
+			vFlashlight = clamp(2.0 * gl_Position.z / vDepth, 0.0,1.0);
+		}
+	</script>
+	<!-- Fragment shader -->
+	<script id="fragment-shader" type="shader/fragment">
+		precision highp float;
+		
+		varying float vShadow;
+		varying vec2 vTexture;
+		varying float vDepth;
+		varying float vFlashlight;
+		
+		uniform sampler2D uSampler;
+		
+		void main () {
+			float scalar = vFlashlight * clamp(50.0/vDepth, 0.0, 1.0);
+			vec4 color = texture2D(uSampler, vTexture * 1.0);
+			gl_FragColor = vec4(scalar * color.rgb * color.rgb * vShadow * vShadow, color.a);
+		}
+	</script>
+	<!-- World -->
+	<script>
+		var superflat = !false;
+		// Code edits will erase the world.
+		// Place save code here to load your world. Make extra sure you got it copied so you don't paste in the wrong thing and delete your world on accident lol
+		var loadString = "ukexk4;s,7,q,-c,6e;1g;0,0,0,0,1,0,0,2,0,0,3,0,0,4,0,0,5,0,0,6,0,0,7,0,0,8,0,0,9,0,0,a,0,0,b,0,0,c,0,0,d,0,0,e,0,0,f,0,0,0,1,0,1,1,0,2,1,0,3,1,0,4,1,0,5,1,0,6,1,0,7,1,0,8,1,0,9,1,1,0,0,1,1,0,1,2,0,1,3,0,1,4,0,1,5,0,1,6,0,1,7,0,1,8,0,1,9,0,1,0,1,1,1,1,1,2,1,1,3,1,1,4,1,1,5,1,1,6,1,1,7,1,1,8,1,1,9,1,2,0,0,2,0,1,2,3,1,2,5,1,2,0,2,3,0,1;4kqq,4kxu,4l4y,4lc2,4lj6,4lqa,4lxe,4m4i,4mbm,4miq,4ny5,4o59,4ocd,4ojh,4oql,4oxp,4p4t,4pbx,4pj1,4pq5,4r3x,4rb1,4ri5,4rp9,4rwd,4s3h,4sal,4shp,4sot,4svx,4u9p,4ugt,4unx,4uv1,4v25,4v99,4vgd,4vnh,4vul,4w1p,4y0t,4y7x,4yf1,4ym5,4yt9,4z0d,4z7h,516l,51dp,51kt,51rx,51z1,5265,52d9,54cd,54jh,54ql,54xp,554t,55bx,55j1,57i5,57p9,57wd,583h,58al,58hp,58ot,5anx,5av1,5b25,5b99,5bgd,5bnh,5bul,5dtp,5e0t,5e7x,5ef1,5em5,5et9,5f0d,5gzh,5h6l,5hdp,5hkt,5hrx,5hz1,5i65,5zb6,5zjx,5zr1,5zy5,6059,60cd,60jh,60ql,60xp,6136,62il,64al,65od,67gd,68u5,6am5,6c71,6ce5,6cl9,6csd,6czh,6d6l,6ddp,6dkt,6drx,6fr1,6gxp,6iwt,6k3h,6m2l,6n99,6p8d,6qf1,6se5,6tkt,6vjx,6wql,6ywt,7dvm,7e4d,7ebh,7eil,7epp,7ewt,7f3x,7fb1,7fi5,7fnm,7h31,7iv1,7k8t,7m0t,7nel,7p6l,7qrh,7qyl,7r5p,7rct,7rjx,7rr1,7ry5,7s59,7scd,7ubh,7vi5,7xh9,7ynx,80n1,81tp,83st,84zh,86yl,8859,8a4d,8bb1,8dh9,8sg2,8sot,8svx,8t31,8ta5,8th9,8tod,8tvh,8u2l,8u82,8vnh,8vul,8w1p,8w8t,8xfh,8yt9,8z0d,8z7h,8zel,90l9,91z1,9265,92d9,92kd,93r1,95q5,95x9,964d,96bh,96il,96pp,96wt,98vx,9a2l,9c1p,9d8d,9f7h,9ge5,9id9,9jjx,9lj1,9mpp,9oot,9pvh,9s1p,a4al,a799,a7gd,a7nh,a7ul,a81p,a88t,a8fx,a8n1,a8si,aat9,abzx,adz1,af5p,ah4t,aibh,akal,akhp,akot,akvx,al31,ala5,alh9,angd,aon1,aqm5,arst,atrx,auyl,awxp,ay4d,b03h,b1a5,b399,b4fx,b6m5,bltp,bm0t,bm7x,bmf1,bmm5,bmt9,bn0d,bn7h,bncy,bnk2,bnr6,bnya,bo5e,bpdp,bqkd,bqrh,bqyl,br5p,brct,bsjh,btq5,btx9,bu4d,bubh,buil,bvp9,bwvx,bx31,bxa5,bxh9,bxod,byv1,bz25,bz99,bzgd,bznh,bzul,c01p,c08t,c0fx,c0n1,c0u5,c20t,c2f1,c2m5,c2t9,c30d,c37h,c3el,c3lp,c3st,c3zx,c56l,c5kt,c5rx,c5z1,c665,c6d9,c6kd,c6rh,c6yl,c75p,c8cd,c8ql,c8xp,c94t,c9bx,c9j1,c9q5,c9x9,ca4d,cabh,cbi5,cbwd,cc3h,ccal,cchp,ccot,ccvx,cd31,cda5,cdh9,cenx,cf25,cf99,cfgd,cfnh,cful,cg1p,cg8t,cgfx,cgn1,chtp,ci7x,cif1,cim5,cit9,cj0d,cj7h,cjel,cjlp,cjst,cl6l,clds,clkw,cls0,clz4,cm68,cmdc,cmkg,cmrk,cmyo,d0e5,d0l9,d0sd,d0zh,d15l,d1j8,d459,d4cd,d4sk,d7b1,d7i5,dagt,danx,ddml,dgsd,djy5,dlok,dn3x,dog4,dq9p,dqfv,dqmc,dr0k,dr7o,dtfh,dwl9,dzr4,eeyl,ef5p,efct,efjx,efq1,eg3o,eiwt,ej9g,em2l,ep8d,es71,evct,eyil,f1od,f4u5,f4zo,f56s,f5l0,f7zx,fb5p,febk,ftj1,ftq5,ftx9,fu4d,fuah,fxh9,g0n1,g3st,g6rh,g9x9,gd31,gg8t,gjel,gk63,gmkd,gpq5,gsw0,h83h,h8al,h8hp,h8ot,h8ux,hc1p,hf7h,hid9,hlbx,hohp,hrnh,hut9,hxz1,i14t,i4al,i7gg,imnx,imv1,in25,in99,infd,ioec,iqm5,irk4,itrx,iwxp,izwd,j325,j67x,j9dp,jcjh,jcp0,jfp9,jiv1,jm0w,k1s2,k4zh,k859,kbb1,kegt,khml,kidg,kksd,klj8,kny5,kop0,kr3x,ku9p,kxfh,l0lc,lgci,ljjx,lmpp,lpvh,lt19,lw71,lzct,m078,m2il,m5od,m8u5,mbzx,mf5s;b9z4,ba68,badc,bakg,bark,bayo,bb5s,bbcw,bbk0,bd4w,bdc0,bdj4,bdq8,bdxc,be4g,bebk,beio,beps,bgao,bghs,bgow,bgw0,bh34,bha8,bhhc,bhog,bhvk,bjgg,bjnk,bjuo,bk1s,bk8w,bkg0,bkn4,bku8,bl1c,bmm8,bmtc,bn0g,bn7k,bneo,bnls,bnsw,bo00,bo74,bps0,bpz4,bq68,bqdc,bqkg,bqrk,bqyo,br5s,brcw,bsxs,bt4w,btc0,btj4,btq8,btxc,bu4g,bubk,buio,bw3k,bwao,bwhs,bwow,bww0,bx34,bxa8,bxhc,bxog,bz97,bzgb,bznf,bzuj,c01n,c08r,c0fv,c0mz,c0u3,c2ez,c2m3,c2t7,c30b,c37f,c3ej,c3ln,c3sr,c3zv,c5kr,c5rv,c5yz,c663,c6d7,c6kb,c6rf,c6yj,c75n,c8qj,c8xn,c94r,c9bv,c9iz,c9q3,c9x7,ca4b,cabf,cbwb,cc3f,ccaj,cchn,ccor,ccvv,cd2z,cda3,cdh7,cf23,cf97,cfgb,cfnf,cfuj,cg1n,cg8r,cgfv,cgmz,ci7v,ciez,cim3,cit7,cj0b,cj7f,cjej,cjln,cjsr,cldn,clkr,clrv,clyz,cm63,cmd7,cmkb,cmrf,cmyj,cocg,cri8,cuo0,cutg,cv0k,cw04,cxts,d0zk,d45c,d7b4,dagw,ddmj,dgsb,djy3,dn3v,don8,dq9n,dtff,du6c,dudg,duo4,dwl7,dzqz,e2ww,e62o,e98g,e9ej,ece8,efk0,eips,elvk,ep1c,es6z,evcr,eyij,f1ob,f4u3,f7zv,fb5n,febf,fhhc,fkn4,fnsw,fqyo,fu4g,fxa8,g0g0,g3ls,g6rf,g9x7,gd2z,gg8r,gjej,gmkb,gpq3,gsvv,gw1s,gz7k,h2dc,h5j4,h8ow,hbuo,hf0g,hi68,hlbv,hohn,hrnf,hut7,hxyz,i14r,i1dw,i4aj,i7gb,iam8,ids0,igxs,ik3k,in9c,iqf4,itkw,iwqo,izwb,j323,j67v,j9dn,jcjf,jfp7,jiuz,jm0r,jp6o,jscg,jvi8,jyo0,jytg,k1ts,k4zk,k85c,kbb4,kegr,khmj,kksb,kny3,kr3v,ku9n,kxff,l0l7,l3r4,l6ww,la2o,ld8g,lge8,ljk0,lmps,lpvk,lt17,lw6z,lzcr,m2ij,m5ob,m8u3,mbzv,mf5n;b9yy,ba62,bad6,baka,bare,bayi,bb5m,bbcq,bbju,bd4q,bdbu,bdiy,bdq2,bdx6,be4a,bebe,beii,bepm,bgai,bghm,bgoq,bgvu,bh2y,bha2,bhh6,bhoa,bhve,bjga,bjne,bjui,bk1m,bk8q,bkfu,bkmy,bku2,bl16,bmm2,bmt6,bn0a,bn7e,bnei,bnlm,bnsq,bnzu,bo6y,bpru,bpyy,bq62,bqd6,bqka,bqre,bqyi,br5m,brcq,bsxm,bt4q,btbu,btiy,btq2,btx6,bu4a,bube,buii,bw3e,bwai,bwhm,bwoq,bwvu,bx2y,bxa2,bxh6,bxoa,bz96,bzga,bzne,bzui,c01m,c08q,c0fu,c0my,c0u2,c2ey,c2m2,c2t6,c30a,c37e,c3ei,c3lm,c3sq,c3zu,c5kq,c5ru,c5yy,c662,c6d6,c6ka,c6re,c6yi,c75m,c8qi,c8xm,c94q,c9bu,c9iy,c9q2,c9x6,ca4a,cabe,cbwa,cc3e,ccai,cchm,ccoq,ccvu,cd2y,cda2,cdh6,cf22,cf96,cfga,cfne,cfui,cg1m,cg8q,cgfu,cgmy,ci7u,ciey,cim2,cit6,cj0a,cj7e,cjei,cjlm,cjsq,cldy,cll2,cls6,clza,cm6e,cmdi,cmkm,cmrq,cmyu,coca,cri2,cunu,cxtm,d0ze,d150,d1c4,d2pw,d456,d4as,d4hw,d4p0,d4w4,d538,d7ay,dagq,ddmi,dgsa,djy2,dn3u,dq9m,dtfe,dwl6,dzra,e2wq,e62i,e98a,ece2,efju,eipm,eivv,elve,ep16,es6y,evcq,eyii,f1oa,f4u2,f7zu,fb5m,febq,fhh6,fkmy,fnsq,fqyi,fu4a,fxa2,fxfo,g0fu,g0lg,g3lm,g3r8,g6re,g6x0,g9x6,gd2y,gg8q,gjei,gmka,gpq2,gsw6,gw1m,gz7e,h2d6,h5iy,h8oq,hbui,hc04,hf0a,hf5w,hi62,hibo,hlbu,hlhg,hohm,hrne,hut6,hxyy,i14q,i4ai,i7gm,iam2,idru,igxm,ik3e,in96,iqey,iqkk,itkq,iwqi,izwa,j322,j67u,j9dm,jcje,jfp6,jiuy,jm12,jp6i,jsca,jvi2,jynu,k1tm,k4ze,k550,k856,kbay,kegq,khmi,kksa,kny2,kr3u,ku9m,kxfe,l0li,l3qy,l6wq,la2i,ld8a,lge2,ljju,ljpg,lmpm,lmv8,lpve,lq10,lt16,lt6s,lw6y,lzcq,m2ii,m5oa,m8u2,mbzu,mf5y;b9za,ba6e,badi,bakm,barq,bayu,bb5y,bbd2,bbk6,bd52,bdc6,bdja,bdqe,bdxi,be4m,bebq,beiu,bepy,bgau,bghy,bgp2,bgw6,bh3a,bhae,bhhi,bhom,bhvq,bjgm,bjnq,bjuu,bk1y,bk92,bkg6,bkna,bkue,bl1i,bmmf,bmtj,bn0n,bn7r,bnev,bnlz,bnt3,bo07,bo7b,bps7,bpzb,bq6f,bqdj,bqkn,bqrr,bqyv,br5z,brd3,bsxz,bt53,btc7,btjb,btqf,btxj,bu4n,bubr,buiv,bw3r,bwav,bwhz,bwp3,bww7,bx3b,bxaf,bxhj,bxon,bz9j,bzgn,bznr,bzuv,c01z,c093,c0g7,c0nb,c0uf,c2fb,c2mf,c2tj,c30n,c37r,c3ev,c3lz,c3t3,c407,c5l3,c5s7,c5zb,c66f,c6dj,c6kn,c6rr,c6yv,c75z,c8pi,c8wm,c93q,c9au,c9hy,c9p2,c9w6,ca3a,caae,cbva,cc2e,cc9i,ccgm,ccnq,ccuu,cd1y,cd92,cdg6,cf12,cf86,cffa,cfme,cfti,cg0m,cg7q,cgeu,cgly,ci6u,cidy,cil2,cis6,ciza,cj6e,cjdi,cjkm,cjrq,clcm,cljq,clqu,clxy,cm52,cmc6,cmja,cmqe,cmxi,cocm,crie,cuo6,cxty,d0zr,d150,d45j,d5hg,d7bb,dah3,ddmv,dgsn,djyf,dn2u,dq8m,dqf5,dqm9,dqtd,dr0h,dr7l,drep,drlt,drsx,ds01,dtee,dwk6,dx50,dzpy,e0w4,e2x2,e62u,e98m,ecee,efk7,eipz,elvr,ep1j,es7b,evd3,eyiv,f1na,f4t2,f4zl,f56q,f5dt,f5kx,f5s1,f5z5,f669,f6dd,f6kh,f7yu,f8ck,fb4m,feae,fhhi,fkna,fnt2,fqyu,fu4n,fxaf,g0g7,g3lz,g6rr,g9xj,gd3b,gg7q,gjdi,gjkr,gjr5,gjy9,gk5d,gkch,gkjl,gkqp,gkxt,gl4x,gmja,gpp2,gsuu,gw1y,gz7q,h2di,h5ja,h8p3,h8uc,hbuv,hf0n,hi6f,hlc7,hohz,hrnr,hus6,hxxy,hy4k,hypt,hywx,hz41,hzb5,hzi9,hzpd,i13q,i49i,i7fa,iame,ibk4,ids6,igxy,ik3q,in9j,iqfb,itl3,iwqv,izwn,j32f,j687,j9cm,jcie,jcp0,jda9,jdhd,jdoh,jdvl,je2p,je9t,jfo6,jity,jlzq,jp6u,jq4k,jscm,jvie,jyo6,k1tz,k4zr,k85j,kbbb,keh3,khmv,kksn,knx2,kr2u,kr9g,krup,ks1t,ks8x,ksg1,ksn5,ksu9,ku8m,kuf8,kxee,kxl0,l0k6,l0qs,l3ra,l4p0,l6x2,l7us,la2u,lb0k,ld8m,lgef,ljk7,ljpg,lmpz,lpvr,lt1j,lw7b,lzd3,m2hi,m5na,m5tw,m6f5,m6m9,m6td,m70h,m77l,m7ep,m8t2,m8zo,mbyu,mc5g,mf4m,mfb8;b9xy,ba52,bac6,baja,baqe,baxi,bb4m,bbbq,bbiu,bd3q,bdau,bdhy,bdp2,bdw6,be3a,beae,behi,beom,bg9i,bggm,bgnq,bguu,bh1y,bh92,bhg6,bhna,bhue,bjfb,bjmf,bjtj,bk0n,bk7r,bkev,bklz,bkt3,bl07,bml3,bms7,bmzb,bn6f,bndj,bnkn,bnrr,bnyv,bo5z,bpqv,bpxz,bq53,bqc7,bqjb,bqqf,bqxj,br4n,brbr,bswn,bt3r,btav,bthz,btp3,btw7,bu3b,buaf,buhj,bw2f,bw9j,bwgn,bwnr,bwuv,bx1z,bx93,bxg7,bxnb,bz87,bzfb,bzmf,bztj,c00n,c07r,c0ev,c0lz,c0t3,c2e2,c2l6,c2sa,c2ze,c36i,c3dm,c3kq,c3ru,c3yy,c5ju,c5qy,c5y2,c656,c6ca,c6je,c6qi,c6xm,c74q,c8pm,c8wq,c93u,c9ay,c9i2,c9p6,c9wa,ca3e,caai,cbve,cc2i,cc9m,ccgq,ccnu,ccuy,cd22,cd96,cdga,cf16,cf8a,cffe,cfmi,cftm,cg0q,cg7u,cgey,cgm2,ci6y,cie2,cil6,cisa,cize,cj6i,cjdm,cjkq,cjru,clcq,clju,clqy,cly2,cm56,cmca,cmje,cmqi,cmxm,coba,cq2s,crh2,cumu,cxsn,d0yf,d447,d5ac,d79z,d7gk,dafr,ddlj,dgre,djx6,dn2y,dq8q,dtei,dwka,dzq2,e2vq,e61i,e97a,ecd3,efiv,eion,eluf,ep07,es5z,evbu,eyhm,f1ne,f4t6,f7yy,fb4q,feai,fhg6,fkly,fnrq,fqxj,fu3b,fx93,g0ev,g3kn,g6qf,g9wa,gd22,gg7u,gjdm,gmje,gpp6,gsuy,gw0m,gz6e,h2c6,h5hz,h8nr,hbtj,hezb,hi53,hlav,hogq,hrmi,husa,hxy2,i13u,i49m,i7fe,ial2,idqu,igwm,ik2f,in87,iqdz,itjr,iwpj,izvb,j316,j66y,j9cq,jcii,jfoa,jiu2,jlzu,jp5i,jsba,jvh2,jymv,k1sn,k4yf,k550,k847,kb9z,kefr,khlm,kkre,knx6,kr2y,ku8q,kxei,l0ka,l3py,l6vq,la1i,ld7b,lgd3,ljiv,lmon,lpuf,lt07,lw62,lzbu,m2hm,m5ne,m8t6,mbyy,mf4q;b9y2,ba56,baca,baje,baqi,baxm,bb4q,bbbu,bbiy,bd3u,bday,bdi2,bdp6,bdwa,be3e,beai,behm,beoq,bg9m,bggq,bgnu,bguy,bh22,bh96,bhga,bhne,bhui,bjfc,bjmg,bjtk,bk0o,bk7s,bkew,bkm0,bkt4,bl08,bml4,bms8,bmzc,bn6g,bndk,bnko,bnrs,bnyw,bo60,bpqw,bpy0,bq54,bqc8,bqjc,bqqg,bqxk,br4o,brbs,bspk,bswo,bt3s,btaw,bti0,btp4,btw8,bu3c,buag,buhk,bvvc,bw2g,bw9k,bwgo,bwns,bwuw,bx20,bx94,bxg8,bxnc,bz14,bz88,bzfc,bzmg,bztk,c00o,c07s,c0ew,c0m0,c0t4,c26w,c2e0,c2l4,c2s8,c2zc,c36g,c3dk,c3ko,c3rs,c3yw,c5co,c5js,c5qw,c5y0,c654,c6c8,c6jc,c6qg,c6xk,c74o,c8il,c8pp,c8wt,c93x,c9b1,c9i5,c9p9,c9wd,ca3h,caal,cbod,cbvh,cc2l,cc9p,ccgt,ccnx,ccv1,cd25,cd99,cdgd,ceu5,cf19,cf8d,cffh,cfml,cftp,cg0t,cg7x,cgf1,cgm5,chzx,ci71,cie5,cil9,cisd,cizh,cj6l,cjdp,cjkt,cjrx,cl5p,clct,cljx,clr1,cly5,cm59,cmcd,cmjh,cmql,cmxp,cobe,crh6,cs90,csuc,cumy,cxso,d0yg,d448,d7a0,d7h7,d7us,d81w,d8g4,d8uc,dafs,ddlk,dgrc,dgxw,dh50,dhc4,dhj8,dhqc,dhxg,di4k,dibo,diis,djx4,dn31,dq8t,dr18,drto,dtel,dwkd,dzq5,e2vu,e61m,e97e,ecd4,efiw,eioo,elug,ep08,es60,evbs,evic,eyhk,f1nh,f4t9,f7z1,fb4t,feal,fhga,fkm2,fksk,fnru,fqxk,fu3c,fx94,g0ew,g0lg,g3ko,g6qg,g9w8,ga2s,gd20,gg7x,gjdp,gjks,gmjh,gpp9,gsv1,gw0q,gz6i,h2ca,h5i0,h8ns,hbtk,hezc,hi54,hlaw,hogo,hon8,hrmg,husd,hxy5,i13x,i49p,i7fh,ial6,idqy,igwq,ik2g,in88,iqe0,itjs,itqc,iwpk,izvc,j314,j37o,j66w,j9ct,jcil,jfod,jiu5,jlzx,jp5m,jsbe,jvh6,jymw,k1so,k4yg,k848,kba0,kefs,khlk,khs4,kkrc,knx9,kr31,kra4,ku8t,kxel,kxlo,l0kd,l0rg,l3q2,l6vu,l72c,la1m,ld7c,lgd4,ljiw,lmoo,lmv8,lpug,lt08,lw60,lzbs,m2hp,m5nh,m5uk,m8t9,m90c,mbz1,mc9o,mf4t;b9r1,b9y5,ba59,bacd,bajh,baql,baxp,bb4t,bbbx,bbj1,bcwt,bd3x,bdb1,bdi5,bdp9,bdwd,be3h,beal,behp,beot,bg2l,bg9p,bggt,bgnx,bgv1,bh25,bh99,bhgd,bhnh,bhul,bj8d,bjfh,bjml,bjtp,bk0t,bk7x,bkf1,bkm5,bkt9,bl0d,bme9,bmld,bmsh,bmzl,bn6p,bndt,bnkx,bns1,bnz5,bo69,bpk1,bpr5,bpy9,bq5d,bqch,bqjl,bqqp,bqxt,br4x,brc1,bspt,bswx,bt41,btb5,bti9,btpd,btwh,bu3l,buap,buht,bvvl,bw2p,bw9t,bwgx,bwo1,bwv5,bx29,bx9d,bxgh,bxnl,bz1d,bz8h,bzfl,bzmp,bztt,c00x,c081,c0f5,c0m9,c0td,c275,c2e9,c2ld,c2sh,c2zl,c36p,c3dt,c3kx,c3s1,c3z5,c5cx,c5k1,c5r5,c5y9,c65d,c6ch,c6jl,c6qp,c6xt,c74x,c8ip,c8pt,c8wx,c941,c9b5,c9i9,c9pd,c9wh,ca3l,caap,cboh,cbvl,cc2p,cc9t,ccgx,cco1,ccv5,cd29,cd9d,cdgh,ceu9,cf1d,cf8h,cffl,cfmp,cftt,cg0x,cg81,cgf5,cgm9,ci05,ci79,cied,cilh,cisl,cizp,cj6t,cjdx,cjl1,cjs5,cl5x,cld1,clk5,clr9,clyd,cm5h,cmcl,cmjp,cmqt,cmxx,cobh,crh9,cun1,cxst,d0yp,d44h,d7a9,d8gw,dag1,ddlt,dgrl,djxd,dn35,dq8x,dtep,dwkl,dwro,dzqd,e0pw,e2vx,e61p,e97h,ecd9,efj5,eiox,elup,ep0h,es69,evc1,eyht,f1nl,f4td,f7z5,fb51,feat,fhgd,fkm5,fnrx,fqxp,fu3l,fx9d,g0f5,g0m8,g3kx,g6qp,g9wh,gd29,gg81,gjdt,gmjl,gpph,gsv9,gw0t,gz6l,h2cd,h5i5,h8o1,hbtt,hezl,hi5d,hlb5,hogx,hrmp,hush,hxy9,i141,i49x,i7fp,ial9,idr1,igwt,ik2l,in8h,iqe9,itk1,iwpt,izvl,j31d,j675,j9cx,jcip,jfoh,jfvk,jiud,jm05,jp5p,jsbh,jvh9,jyn1,k1sx,k4yp,k84h,kba9,keg1,khlt,kkrl,knxd,kr35,ku8x,kxet,l0kl,l3q5,l6vx,la1p,ld7h,lgdd,ljj5,lmox,lpup,lt0h,lw69,lzc1,m2ht,m5nl,m8td,mbz9,mf51;b9r9,b9yd,ba5h,bacl,bajp,baqt,baxx,bb51,bbc5,bbj9,bcx1,bd45,bdb9,bdid,bdph,bdwl,be3p,beat,behx,bep1,bg2t,bg9x,bgh1,bgo5,bgv9,bh2d,bh9h,bhgl,bhnp,bhut,bj8l,bjfp,bjmt,bjtx,bk11,bk85,bkf9,bkmd,bkth,bl0l,bmed,bmlh,bmsl,bmzp,bn6t,bndx,bnl1,bns5,bnz9,bo6d,bpk5,bpr9,bpyd,bq5h,bqcl,bqjp,bqqt,bqxx,br51,brc5,bspx,bsx1,bt45,btb9,btid,btph,btwl,bu3p,buat,buhx,bvvp,bw2t,bw9x,bwh1,bwo5,bwv9,bx2d,bx9h,bxgl,bxnp,bz1f,bz8j,bzfn,bzmr,bztv,c00z,c083,c0f7,c0mb,c0tf,c277,c2eb,c2lf,c2sj,c2zn,c36r,c3dv,c3kz,c3s3,c3z7,c5cz,c5k3,c5r7,c5yb,c65f,c6cj,c6jn,c6qr,c6xv,c74z,c8ir,c8pv,c8wz,c943,c9b7,c9ib,c9pf,c9wj,ca3n,caar,cboj,cbvn,cc2r,cc9v,ccgz,cco3,ccv7,cd2b,cd9f,cdgj,ceub,cf1f,cf8j,cffn,cfmr,cftv,cg0z,cg83,cgf7,cgmb,ci03,ci77,cieb,cilf,cisj,cizn,cj6r,cjdv,cjkz,cjs3,cl5v,clcz,clk3,clr7,clyb,cm5f,cmcj,cmjn,cmqr,cmxv,cobp,cpwk,crhh,cun9,cxt1,d0yt,d44l,d7ad,dag5,dbfo,ddlv,dfdu,dgrn,djxf,dn37,dq8z,dter,dwkj,dwrm,dzqb,e0bm,e2w5,e61x,e97p,ecdh,efj9,eip1,elut,ep0l,es6b,evc3,eyhv,f1nn,f4tf,f6ea,f6le,f7z7,fb4z,fear,fhgl,fkmd,fns5,fqxx,fu3p,fx9h,g0f9,g0mc,g3l1,g6qr,g9wj,gd2b,gg83,gjdv,gmjn,gppf,gsv7,gw11,gz6t,h2cl,h5id,h8o5,hbtx,hezp,hi5h,hlb7,hogz,hrmr,husj,hxyb,hzc2,i143,i49v,i7fn,ialh,idr9,igx1,ik2t,in8l,iqed,itk5,iwpx,izvn,j31f,j677,j9cz,jcir,jfoj,jiub,jj1e,jm03,jp5x,jsbp,jvhh,jyn9,k1t1,k4yt,k55w,k84l,kbad,keg3,khlv,kkrn,knxf,kr37,ku8z,kxer,l0kj,l3qd,l6w5,la1x,ld7p,lgdh,ljj9,lmp1,lput,lt0j,lw6b,lzc3,m2hv,m5nn,m8tf,mbz7,mf4z;b9r7,b9yb,ba5f,bacj,bajn,baqr,baxv,bb4z,bbc3,bbj7,bcwz,bd43,bdb7,bdib,bdpf,bdwj,be3n,bear,behv,beoz,bg2v,bg9z,bgh3,bgo7,bgvb,bh2f,bh9j,bhgn,bhnr,bhuv,bj8n,bjfr,bjmv,bjtz,bk13,bk87,bkfb,bkmf,bktj,bl0n,bmef,bmlj,bmsn,bmzr,bn6v,bndz,bnl3,bns7,bnzb,bo6f,bpk7,bprb,bpyf,bq5j,bqcn,bqjr,bqqv,bqxz,br53,brc7,bspz,bsx3,bt47,btbb,btif,btpj,btwn,bu3r,buav,buhz,bvvr,bw2v,bw9z,bwh3,bwo7,bwvb,bx2f,bx9j,bxgn,bxnr,bz1j,bz8n,bzfr,bzmv,bztz,c013,c087,c0fb,c0mf,c0tj,c27b,c2ef,c2lj,c2sn,c2zr,c36v,c3dz,c3l3,c3s7,c3zb,c5d3,c5k7,c5rb,c5yf,c65j,c6cn,c6jr,c6qv,c6xz,c753,c8iv,c8pz,c8x3,c947,c9bb,c9if,c9pj,c9wn,ca3r,caav,cobn,cpb6,crhf,ct9e,cunb,cxt3,d0yv,d44n,d4x2,d7af,d8h2,dag7,dc86,ddlz,dgrr,djxj,dn3b,e2w3,e61v,e97r,ecdj,efjb,eip3,eiw6,eluv,ep0n,es6f,evc7,eyhz,f1nr,fhgj,fkmb,fns7,fqxz,fu3r,fx9j,fxgm,g0fb,g3l3,g6qv,g9wn,gd2f,gg87,gw0z,gz6r,h2cn,h5if,h8o7,hbtz,hc12,hezr,hi5j,hlbb,hoh3,hrmv,husn,ialf,idr7,igx3,ik2v,in8n,iqef,iqli,itk7,itra,iwpz,iwx2,izvr,j02u,j31j,j67b,j9d3,jp5v,jsbn,jvhj,jynb,k1t3,k4yv,k55y,k84n,k8bq,kbaf,kbhi,keg7,kena,khlz,kkrr,knxj,l3qb,l6w3,la1z,ld7r,lgdj,ljjb,ljqe,lmp3,lpuv,lt0n,lw6f,lzc7,m2hz;;;;;;;;bl6q,bldu,blky,bls2,blz6,bm6a,bmde,bmki,bmrm,bmyq,bn5u,boe5,bol9,bosd,bozh,bp6l,bpdp,bpkt,bprx,bpz1,bq65,bqd9,brjx,brr1,bry5,bs59,bscd,bsjh,bsql,bsxp,bt4t,btbx,btj1,bupp,buwt,bv3x,bvb1,bvi5,bvp9,bvwd,bw3h,bwal,bwhp,bwot,bxvh,by2l,by9p,bygt,bynx,byv1,bz25,bz99,bzgd,bznh,bzul,c119,c18d,c1fh,c1ml,c1tp,c20t,c27x,c2f1,c2m5,c2t9,c30d,c471,c4e5,c4l9,c4sd,c4zh,c56l,c5dp,c5kt,c5rx,c5z1,c665,c7ct,c7jx,c7r1,c7y5,c859,c8cd,c8jh,c8ql,c8xp,c94t,c9bx,cail,capp,cawt,cb3x,cbb1,cbi5,cbp9,cbwd,cc3h,ccal,cchp,cdod,cdvh,ce2l,ce9p,cegt,cenx,cev1,cf25,cf99,cfgd,cfnh,cgu5,ch19,ch8d,chfh,chml,chtp,ci0t,ci7x,cif1,cim5,cit9,ck00,ck74,cke8,cklc,cksg,ckzk,cl6o,clds,clkw,cls0,clz4,d1xe,d54t,d7h7,d8al,da84,db7o,dbgd,dczo,dem5,dfr8,dhrx,dkxp,do3h,dr99,duf1,dxkt,e0qo,eghu,ejp9,emv1,eq0t,et6l,ewcd,ezi5,f2nx,f5tp,f8zh,fc59,ffb4,fv2a,fy9p,g1fh,g4ck,g4l9,g7r1,gawt,ge2l,gh8d,gke5,gnjx,gqpp,gtvk,h9mq,hcu5,hfzx,hj5p,hmbh,hph9,hsn1,hvst,hyyl,i24d,i5a5,i8g0,io76,irel,iukd,ixq5,j0vx,j41p,j77h,jad9,jdj1,jgot,jjul,jn0g,k2rm,k5z1,k8w4,k94t,kcal,kfgd,kim5,klrx,koxp,ks3h,kv99,kyf1,l1kw,lhc2,lkjh,lnp9,lqv1,lu0t,lx6l,m0cd,m3i5,m6nx,m9tp,mczh,mg5c;b8lc,b8sg,b8zk,b96o,b9ds,b9kw,b9s0,b9z4,ba68,badc,bakg,bbr4,bby8,bc5c,bccg,bcjk,bcqo,bcxs,bd4w,bdc0,bdj4,bdq8,beww,bf40,bfb4,bfi8,bfpc,bfwg,bg3k,bgao,bghs,bgow,bgw0,bi2o,bi9s,bigw,bio0,biv4,bj28,bj9c,bjgg,bjnk,bjuo,bk1s,bl8g,blfk,blmo,blts,bm0w,bm80,bmf4,bmm8,bmtc,bn0g,bn7k,boe8,bolc,bosg,bozk,bp6o,bpds,bpkw,bps0,bpz4,bq68,bqdc,brk0,brr4,bry8,bs5c,bscg,bsjk,bsqo,bsxs,bt4w,btc0,btj4,bups,buww,bv40,bvb4,bvi8,bvpc,bvwg,bw3k,bwao,bwhs,bwow,bxvf,by2j,by9n,bygr,bynv,byuz,bz23,bz97,bzgb,bznf,bzuj,c117,c18b,c1ff,c1mj,c1tn,c20r,c27v,c2ez,c2m3,c2t7,c30b,c46z,c4e3,c4l7,c4sb,c4zf,c56j,c5dn,c5kr,c5rv,c5yz,c663,c7cr,c7jv,c7qz,c7y3,c857,c8cb,c8jf,c8qj,c8xn,c94r,c9bv,caij,capn,cawr,cb3v,cbaz,cbi3,cbp7,cbwb,cc3f,ccaj,cchn,cdob,cdvf,ce2j,ce9n,cegr,cenv,ceuz,cf23,cf97,cfgb,cfnf,cgu3,ch17,ch8b,chff,chmj,chtn,ci0r,ci7v,ciez,cim3,cit7,cjzv,ck6z,cke3,ckl7,cksb,ckzf,cl6j,cldn,clkr,clrv,clyz,cpc0,cshs,ctfo,ctms,cumz,cutg,cv0k,cv7o,cves,cvnk,cytc,d1z4,d54w,d8ao,dbgg,dem3,dhrv,dkxn,dm9w,dn9g,do3f,dr97,duez,dxkr,e0qj,e3wg,e728,ea80,edds,egjk,ejpc,emv4,eq0w,et6j,ewcb,ezi3,f2nv,f5tn,f8zf,fc57,ffaz,figw,flmo,fosg,fry8,fv40,fy9s,g1fk,g4lc,g7qz,gawr,ge2j,gh8b,gke3,gnjv,gqpn,gtvf,gx1c,h074,h344,h3cw,h6io,h9og,hcu8,hg00,hj5s,hmbf,hph7,hsmz,hvk4,hvsr,hyyj,i24b,i5a3,i8fv,ibls,ierk,ihxc,il34,io8w,ireo,iukg,ixq8,j0vv,j41n,j77f,jad7,jdiz,jgor,jjuj,jn0b,jq68,jtc0,jwhs,jznk,k2tc,k5z4,k94w,kcao,kfgb,kim3,klrv,koxn,ks3f,kv97,kyez,l1kr,l4qo,l7wg,lb28,le80,lhds,lkjk,lnpc,lqv4,lu0r,lwxw,lx6j,m078,m0cb,m3i3,m6nv,m9tn,mczf,mg57;b8l6,b8sa,b8ze,b96i,b9dm,b9kq,b9ru,b9yy,ba62,bad6,baka,bbqy,bby2,bc56,bcca,bcje,bcqi,bcxm,bd4q,bdbu,bdiy,bdq2,bewq,bf3u,bfay,bfi2,bfp6,bfwa,bg3e,bgai,bghm,bgoq,bgvu,bi2i,bi9m,bigq,binu,biuy,bj22,bj96,bjga,bjne,bjui,bk1m,bl8a,blfe,blmi,bltm,bm0q,bm7u,bmey,bmm2,bmt6,bn0a,bn7e,boe2,bol6,bosa,boze,bp6i,bpdm,bpkq,bpru,bpyy,bq62,bqd6,brju,brqy,bry2,bs56,bsca,bsje,bsqi,bsxm,bt4q,btbu,btiy,bupm,buwq,bv3u,bvay,bvi2,bvp6,bvwa,bw3e,bwai,bwhm,bwoq,bxve,by2i,by9m,bygq,bynu,byuy,bz22,bz96,bzga,bzne,bzui,c116,c18a,c1fe,c1mi,c1tm,c20q,c27u,c2ey,c2m2,c2t6,c30a,c46y,c4e2,c4l6,c4sa,c4ze,c56i,c5dm,c5kq,c5ru,c5yy,c662,c7cq,c7ju,c7qy,c7y2,c856,c8ca,c8je,c8qi,c8xm,c94q,c9bu,caii,capm,cawq,cb3u,cbay,cbi2,cbp6,cbwa,cc3e,ccai,cchm,cdoa,cdve,ce2i,ce9m,cegq,cenu,ceuy,cf22,cf96,cfga,cfne,cgu2,ch16,ch8a,chfe,chmi,chtm,ci0q,ci7u,ciey,cim2,cit6,ck06,ck7a,ckee,ckli,cksm,ckzq,cl6u,cldy,cll2,cls6,clza,cpbu,cshm,cuf8,cvff,cvne,cwzo,cyt6,d1yy,d54q,d8ai,dbga,dem2,dhru,dkxm,do3e,dr96,duey,dxkq,e0qu,e3wa,e722,ea7u,eddm,egje,ejp6,emuy,eq0q,et6i,ewca,ezi2,f2nu,f5tm,f8ze,fc56,ffba,figq,flmi,fojo,fosa,fry2,fv3u,fy9m,g1fe,g4l6,g7qy,gawq,ge2i,gh8a,gke2,gnju,gpvo,gq2s,gq9w,gqh0,gqpm,gtvq,gx16,h06y,h3cq,h6ii,h9oa,hcu2,hfzu,hj5m,hmbe,hph6,hsmy,hvsq,hyyi,i24a,i4g4,i51g,i5a2,i8g6,iblm,iere,ihx6,il2y,io8q,irei,iuka,ixq2,j0vu,j41m,j77e,jad6,jdiy,jgoq,ji84,jjlw,jjui,jksk,jldw,jmro,jn0m,jq62,jtbu,jw90,jwhm,jzne,k2t6,k5yy,k94q,kcai,kfga,kim2,klru,koxm,ks3e,kv96,kyey,l1l2,l4qi,l7wa,latg,lb22,ldz8,le7u,lh50,lhdm,lkas,lkje,lnp6,lquy,lu0q,lx6i,m0ca,m3i2,m6nu,m9tm,mcqs,mcze,mg5i;7i9z,7ih3,7io7,7ivb,7lfr,7lmv,7ltz,7m13,8tvr,8u2v,8u9z,8wuf,9007,93d3,93k7,93rb,a8g7,abev,abt3,ac07,aedj,aekn,aeyv,af5z,ahxj,al3b,b8li,b8sm,b8zq,b96u,b9dy,b9l2,b9s6,b9za,ba6e,badi,bakm,bbra,bbye,bc5i,bccm,bcjq,bcqu,bcxy,bd52,bdc6,bdja,bdqe,bex2,bf46,bfba,bfie,bfpi,bfwm,bg3q,bgau,bghy,bgp2,bgw6,bi2u,bi9y,bih2,bio6,biva,bj2e,bj9i,bjgm,bjnq,bjuu,bk1y,bl8n,blfr,blmv,bltz,bm13,bm87,bmfb,bmmf,bmtj,bn0n,bn7r,boef,bolj,bosn,bozr,bp6v,bpdz,bpl3,bps7,bpzb,bq6f,bqdj,brk7,brrb,bryf,bs5j,bscn,bsjr,bsqv,bsxz,bt53,btc7,btjb,bupz,bux3,bv47,bvbb,bvif,bvpj,bvwn,bw3r,bwav,bwhz,bwp3,bxvr,by2v,by9z,byh3,byo7,byvb,bz2f,bz9j,bzgn,bznr,bzuv,c11j,c18n,c1fr,c1mv,c1tz,c213,c287,c2fb,c2mf,c2tj,c30n,c47b,c4ef,c4lj,c4sn,c4zr,c56v,c5dz,c5l3,c5s7,c5zb,c66f,c7bq,c7iu,c7py,c7x2,c846,c8ba,c8ie,c8pi,c8wm,c93q,c9au,cahi,caom,cavq,cb2u,cb9y,cbh2,cbo6,cbva,cc2e,cc9i,ccgm,cdna,cdue,ce1i,ce8m,cefq,cemu,cety,cf12,cf86,cffa,cfme,cgt2,ch06,ch7a,chee,chli,chsm,chzq,ci6u,cidy,cil2,cis6,cjyu,ck5y,ckd2,ckk6,ckra,ckye,cl5i,clcm,cljq,clqu,clxy,cpc6,cshy,cvnq,cyti,czyc,d0qs,d1zb,d553,d8av,dbgn,demf,dhs7,dkxz,dmv8,dn9g,dnus,do2e,dp1d,dp8h,dpfl,dpmp,dptt,dr86,dudy,dxjq,e0pi,e3wm,e72e,ea86,eddy,egas,egjr,ejpj,emvb,eq13,et6v,ewcn,ezif,f2mu,f3lt,f3sx,f401,f475,f4e9,f4sh,f4zl,f56p,f5dt,f5sm,f8ye,fc46,ff9y,fih2,flmu,fosm,frye,fuv8,fv47,fy9z,g1fr,g4lj,g7rb,gax3,ge2v,gh7a,gi69,gidd,gikh,girl,giyp,gjcx,gjk1,gjr5,gjy9,gkd2,gniu,gqom,gtue,gx1i,h07a,h3d2,h6iu,h9fo,h9on,hclg,hcuf,hfr8,hg07,hix0,hj5z,hmbr,hphj,hsnb,hukk,hvrq,hwqp,hwxt,hx4x,hxc1,hxj5,hxxd,hy4h,hybl,hyip,hyxi,i23a,i592,i8eu,i9dw,ibd0,ibly,ierq,ihxi,il3a,io04,io93,ir5w,irev,iubo,iukn,ixhg,ixqf,j0w7,j41z,j77r,ja4k,jac6,jbb5,jbi9,jbpd,jbwh,jc3l,jcht,jcox,jcw1,jd35,jdhy,jgnq,jjti,jmza,jq6e,jtc6,jwhy,jznq,k2kk,k2tj,k5zb,k953,kcav,kfgn,kimf,kls7,knpg,kowm,kpvl,kq2p,kq9t,kqgx,kqo1,kqys,kr29,kr9d,krgh,krnl,ks2e,kv86,kydy,l1jq,l4qu,l7wm,lb2e,le86,lh50,lhdz,lkjr,lnpj,lqvb,lu13,lx6v,m0cn,m3h2,m4g1,m4n5,m4u9,m51d,m58h,m5mp,m5tt,m60x,m681,m6mu,m9sm,mcye,mg46;b8k6,b8ra,b8ye,b95i,b9cm,b9jq,b9qu,b9xy,ba52,bac6,baja,bbpy,bbx2,bc46,bcba,bcie,bcpi,bcwm,bd3q,bdau,bdhy,bdp2,bevq,bf2u,bf9y,bfh2,bfo6,bfva,bg2e,bg9i,bggm,bgnq,bguu,bi1j,bi8n,bifr,bimv,bitz,bj13,bj87,bjfb,bjmf,bjtj,bk0n,bl7b,blef,bllj,blsn,blzr,bm6v,bmdz,bml3,bms7,bmzb,bn6f,bod3,bok7,borb,boyf,bp5j,bpcn,bpjr,bpqv,bpxz,bq53,bqc7,briv,brpz,brx3,bs47,bsbb,bsif,bspj,bswn,bt3r,btav,bthz,buon,buvr,bv2v,bv9z,bvh3,bvo7,bvvb,bw2f,bw9j,bwgn,bwnr,bxuf,by1j,by8n,byfr,bymv,bytz,bz13,bz87,bzfb,bzmf,bztj,c10a,c17e,c1ei,c1lm,c1sq,c1zu,c26y,c2e2,c2l6,c2sa,c2ze,c462,c4d6,c4ka,c4re,c4yi,c55m,c5cq,c5ju,c5qy,c5y2,c656,c7bu,c7iy,c7q2,c7x6,c84a,c8be,c8ii,c8pm,c8wq,c93u,c9ay,cahm,caoq,cavu,cb2y,cba2,cbh6,cboa,cbve,cc2i,cc9m,ccgq,cdne,cdui,ce1m,ce8q,cefu,cemy,ceu2,cf16,cf8a,cffe,cfmi,cgt6,ch0a,ch7e,chei,chlm,chsq,chzu,ci6y,cie2,cil6,cisa,cjyy,ck62,ckd6,ckka,ckre,ckyi,cl5m,clcq,clju,clqy,cly2,cnic,cnwk,cohw,cp38,cpau,csgm,cvme,cys7,d1xz,d344,d3b8,d4as,d53r,d89j,dbfb,del3,dhqy,dkwq,do2i,dr8a,due2,dxju,e0pm,e3va,e712,ea6u,edcn,egif,ejo7,emtz,epzr,et5j,ewbe,ezh6,f2my,f5sq,f8yi,fc4a,ffa2,fifq,flli,fora,frx3,fv2v,fy8n,g1ef,g4k7,g7pz,gavu,ge1m,gh7e,gkd6,gniy,gqoq,gtui,gx06,h05y,h3bq,h6hj,h9nb,hct3,hfyv,hj4n,hmaf,hpga,hsm2,hvru,hyxm,i23e,i596,i8ey,ibkm,ieis,ieqe,ihw6,il1z,io7r,ir5w,irdj,iujb,ixp3,j0uv,j40q,j76i,jaca,jdi2,jgnu,jjtm,jmze,jq52,jtau,jwgm,jzmf,k2s7,k5xz,k93r,kc9j,kffb,kil6,klqy,kowq,ks2i,kv8a,kye2,l1ju,l4pi,l7va,lb12,le6v,lhcn,lkif,lno7,lqtz,ltzr,lx5m,m0be,m3h6,m6my,m9sq,mcyi,mg4a;b8ka,b8re,b8yi,b95m,b9cq,b9ju,b9qy,b9y2,ba56,baca,baje,bbq2,bbx6,bc4a,bcbe,bcii,bcpm,bcwq,bd3u,bday,bdi2,bdp6,bevu,bf2y,bfa2,bfh6,bfoa,bfve,bg2i,bg9m,bggq,bgnu,bguy,bi1k,bi8o,bifs,bimw,biu0,bj14,bj88,bjfc,bjmg,bjtk,bk0o,bl7c,bleg,bllk,blso,blzs,bm6w,bme0,bml4,bms8,bmzc,bn6g,bod4,bok8,borc,boyg,bp5k,bpco,bpjs,bpqw,bpy0,bq54,bqc8,bqjc,briw,brq0,brx4,bs48,bsbc,bsig,bspk,bswo,bt3s,btaw,bti0,btp4,buoo,buvs,bv2w,bva0,bvh4,bvo8,bvvc,bw2g,bw9k,bwgo,bwns,bwuw,bxug,by1k,by8o,byfs,bymw,byu0,bz14,bz88,bzfc,bzmg,bztk,c00o,c108,c17c,c1eg,c1lk,c1so,c1zs,c26w,c2e0,c2l4,c2s8,c2zc,c36g,c460,c4d4,c4k8,c4rc,c4yg,c55k,c5co,c5js,c5qw,c5y0,c654,c6c8,c7bx,c7j1,c7q5,c7x9,c84d,c8bh,c8il,c8pp,c8wt,c93x,c9b1,c9i5,cahp,caot,cavx,cb31,cba5,cbh9,cbod,cbvh,cc2l,cc9p,ccgt,ccnx,cdnh,cdul,ce1p,ce8t,cefx,cen1,ceu5,cf19,cf8d,cffh,cfml,cftp,cgt9,ch0d,ch7h,chel,chlp,chst,chzx,ci71,cie5,cil9,cisd,cizh,cjz1,ck65,ckd9,ckkd,ckrh,ckyl,cl5p,clct,cljx,clr1,cly5,cm59,cnwk,cpay,cq9w,crno,csgq,cvmi,cys8,d1y0,d53s,d62s,d69w,d6o4,d6v8,d7a3,d7gk,d89k,db0k,db7o,dbfc,del4,dfk4,dfr8,dfyc,dg5g,dgck,dgjo,dhqw,dkwo,do2l,dpng,dqn0,dr8d,due5,dxjx,e0pp,e3ve,e716,ea6y,edco,egig,ejo8,emu0,epzs,et5k,ewbc,ezh4,f2n1,f5st,f8yl,fc4d,ffa5,fifu,fldw,fllm,fore,frx4,fv2w,fy8o,g1eg,g4ck,g4k8,g7q0,gavs,ge1k,gh7h,gkd9,gnj1,gqot,gtul,gx0a,h062,h3bu,h6hk,h9nc,hct4,hfyw,hj4o,hmag,hpg8,hsm0,hvrx,hyxp,i23h,i599,i8f1,ibkq,ieqi,ihwa,il20,io7s,irdk,iujc,ixhg,ixp4,j0uw,j40o,j76g,jacd,jdb0,jdi5,jgnx,jjtp,jmzh,jq56,jtay,jwgq,jzmg,k2s8,k5y0,k93s,kc9k,kffc,kil4,klqw,kowt,ks2l,kv18,kv8d,kye5,l1jx,l4pm,l7ve,latg,lb16,le6w,lhco,lkig,lno8,lqu0,ltzs,lx5k,m0bc,m3h9,m6n1,m9st,mcrg,mcyl,mg4d;b8kd,b8rh,b8yl,b95p,b9ct,b9jx,b9r1,b9y5,ba59,bacd,bajh,baql,bbq5,bbx9,bc4d,bcbh,bcil,bcpp,bcwt,bd3x,bdb1,bdi5,bdp9,bdwd,bevx,bf31,bfa5,bfh9,bfod,bfvh,bg2l,bg9p,bggt,bgnx,bgv1,bh25,bi1p,bi8t,bifx,bin1,biu5,bj19,bj8d,bjfh,bjml,bjtp,bk0t,bk7x,bl7l,blep,bllt,blsx,bm01,bm75,bme9,bmld,bmsh,bmzl,bn6p,bndt,bodd,bokh,borl,boyp,bp5t,bpcx,bpk1,bpr5,bpy9,bq5d,bqch,bqjl,brj5,brq9,brxd,bs4h,bsbl,bsip,bspt,bswx,bt41,btb5,bti9,btpd,buox,buw1,bv35,bva9,bvhd,bvoh,bvvl,bw2p,bw9t,bwgx,bwo1,bwv5,bxup,by1t,by8x,byg1,byn5,byu9,bz1d,bz8h,bzfl,bzmp,bztt,c00x,c10h,c17l,c1ep,c1lt,c1sx,c201,c275,c2e9,c2ld,c2sh,c2zl,c36p,c469,c4dd,c4kh,c4rl,c4yp,c55t,c5cx,c5k1,c5r5,c5y9,c65d,c6ch,c7c1,c7j5,c7q9,c7xd,c84h,c8bl,c8ip,c8pt,c8wx,c941,c9b5,c9i9,caht,caox,caw1,cb35,cba9,cbhd,cboh,cbvl,cc2p,cc9t,ccgx,cco1,cdnl,cdup,ce1t,ce8x,ceg1,cen5,ceu9,cf1d,cf8h,cffl,cfmp,cftt,cgth,ch0l,ch7p,chet,chlx,cht1,ci05,ci79,cied,cilh,cisl,cizp,cjz9,ck6d,ckdh,ckkl,ckrp,ckyt,cl5x,cld1,clk5,clr9,clyd,cm5h,cpb1,csgt,cvml,cysd,d1y9,d541,d6ao,d7a8,d89t,dbfl,deld,dhr5,dkwx,do2p,dr8h,due9,dxk5,e0px,e3vh,e719,ea71,edct,egip,ejoh,emu9,eq01,et5t,ewbl,ezhd,f2n5,f5sx,f8yp,fc4l,ffad,fifx,fllp,forh,frx9,fv35,fy8x,g1ep,g4kh,g7q9,gaw1,ge1t,gh7l,gkdd,gnj5,gqp1,gtut,gx0d,h065,h3bx,h6hp,h9nl,hctd,hfz5,hj4x,hmap,hpgh,hsm9,hvs1,hyxt,i23l,i59h,i8f9,ibkt,ieql,ihwd,il25,io81,irdt,iucg,iujl,ixpd,j0v5,j40x,j76p,jach,jdi9,jgo1,jjtx,jmzp,jq59,jtb1,jwgt,jzml,k2sh,k5y9,k941,kc9t,kffl,kild,klr5,kowx,ks2p,kv8h,kyed,l1k5,l4pp,l7vh,lb19,le71,lhcx,lkip,lnoh,lqu9,lu01,lx5t,m0bl,m3hd,m6n5,m9sx,mcyt,mg4l;b8kl,b8rp,b8yt,b95x,b9d1,b9k5,b9r9,b9yd,ba5h,bacl,bajp,baqt,bbqd,bbxh,bc4l,bcbp,bcit,bcpx,bcx1,bd45,bdb9,bdid,bdph,bdwl,bew5,bf39,bfad,bfhh,bfol,bfvp,bg2t,bg9x,bgh1,bgo5,bgv9,bh2d,bi1x,bi91,big5,bin9,biud,bj1h,bj8l,bjfp,bjmt,bjtx,bk11,bk85,bl7p,blet,bllx,blt1,bm05,bm79,bmed,bmlh,bmsl,bmzp,bn6t,bndx,bodh,bokl,borp,boyt,bp5x,bpd1,bpk5,bpr9,bpyd,bq5h,bqcl,bqjp,brj9,brqd,brxh,bs4l,bsbp,bsit,bspx,bsx1,bt45,btb9,btid,btph,bup1,buw5,bv39,bvad,bvhh,bvol,bvvp,bw2t,bw9x,bwh1,bwo5,bwv9,bxur,by1v,by8z,byg3,byn7,byub,bz1f,bz8j,bzfn,bzmr,bztv,c00z,c10j,c17n,c1er,c1lv,c1sz,c203,c277,c2eb,c2lf,c2sj,c2zn,c36r,c46b,c4df,c4kj,c4rn,c4yr,c55v,c5cz,c5k3,c5r7,c5yb,c65f,c6cj,c7c3,c7j7,c7qb,c7xf,c84j,c8bn,c8ir,c8pv,c8wz,c943,c9b7,c9ib,cahv,caoz,caw3,cb37,cbab,cbhf,cboj,cbvn,cc2r,cc9v,ccgz,cco3,cdnn,cdur,ce1v,ce8z,ceg3,cen7,ceub,cf1f,cf8j,cffn,cfmr,cftv,cgtf,ch0j,ch7n,cher,chlv,chsz,ci03,ci77,cieb,cilf,cisj,cizn,cjz7,ck6b,ckdf,ckkj,ckrn,ckyr,cl5v,clcz,clk3,clr7,clyb,cm5f,cniz,cnqc,cnxg,co4k,cobo,cois,copw,cox0,cp44,cpb9,cqw4,crhg,crok,cs2s,csh1,cu1w,cun8,cuuc,cv8k,cvmt,cx7o,cxt0,cy04,cyec,cysl,d1yd,d545,d89x,dbfp,delf,dg6a,dhr7,dk4i,dkwz,do2r,dr8j,dueb,dxk3,e0pv,e3ok,e3vp,e71h,ea79,edd1,egit,ejol,emud,eq05,et5v,ewbn,ezhf,f2n7,f3tu,f40y,f4f6,f5sz,f8yr,fc4j,ffab,fi90,fig5,fles,fllx,fokk,forp,frqc,frxh,fv39,fy91,g1et,g4kl,g7qb,gaw3,ge1v,gh0b,gh7n,gizm,gkdf,gnj7,gqoz,gtur,gwtg,gx0l,h06d,h3c5,h6hx,h9np,hcth,hfz9,hj51,hmar,hpgj,hsmb,hvs3,hyxv,i23n,i59f,i8f7,ibdw,ibl1,ieqt,ihwl,il2d,io85,irdx,iujp,ixph,j0v7,j40z,j76r,jacj,jc4i,jdib,jgo3,jjtv,jmzn,jpyc,jq5h,jt44,jtb9,jw9w,jwh1,jzfo,jzmt,k2sl,k5yd,k945,kc9x,kffn,kilf,klr7,kowz,kqoy,krvm,ks2r,kv8j,kyeb,l1k3,l4is,l4px,l7ok,l7vp,lauc,lb1h,le04,le79,lhd1,lkit,lnol,lqud,lu03,lx5v,m0bn,m3hf,m6n7,m9sz,mcyr,mg4j;b8kj,b8rn,b8yr,b95v,b9cz,b9k3,b9r7,b9yb,ba5f,bacj,bajn,baqr,bbqb,bbxf,bc4j,bcbn,bcir,bcpv,bcwz,bd43,bdb7,bdib,bdpf,bdwj,bew7,bf3b,bfaf,bfhj,bfon,bfvr,bg2v,bg9z,bgh3,bgo7,bgvb,bh2f,bi1z,bi93,big7,binb,biuf,bj1j,bj8n,bjfr,bjmv,bjtz,bk13,bk87,bl7r,blev,bllz,blt3,bm07,bm7b,bmef,bmlj,bmsn,bmzr,bn6v,bndz,bodj,bokn,borr,boyv,bp5z,bpd3,bpk7,bprb,bpyf,bq5j,bqcn,bqjr,brjb,brqf,brxj,bs4n,bsbr,bsiv,bspz,bsx3,bt47,btbb,btif,btpj,bup3,buw7,bv3b,bvaf,bvhj,bvon,bvvr,bw2v,bw9z,bwh3,bwo7,bwvb,bxuv,by1z,by93,byg7,bynb,byuf,bz1j,bz8n,bzfr,bzmv,bztz,c013,c10n,c17r,c1ev,c1lz,c1t3,c207,c27b,c2ef,c2lj,c2sn,c2zr,c36v,c46f,c4dj,c4kn,c4rr,c4yv,c55z,c5d3,c5k7,c5rb,c5yf,c65j,c6cn,c7c7,c7jb,c7qf,c7xj,c84n,c8br,c8iv,c8pz,c8x3,c947,c9bb,c9if,cpb7,cqw2,csgz,cuna,cvfq,cvmv,cysn,d1yf,d547,d89z,d9uu,daue,dbfr,delj,dhrb,dkx3,do2v,e3vn,e71f,ea7b,edd3,egiv,ejon,emuf,eq07,et5z,ewbr,ezhj,f2nb,fig3,fllv,forr,frqe,frxj,fv3b,fy93,g1ev,g4kn,g7qf,gaw7,ge1z,gh7r,gx0j,h06b,h3c7,h6hz,h9nr,hctj,hfzb,hj53,hmav,hpgn,hsmf,hvs7,ibkz,ieqr,ihwn,il2f,io87,irdz,iujr,ixie,ixpj,j0vb,j413,j76v,jacn,jq5f,jtb7,jwh3,jzmv,k2sn,k5yf,k947,kc9z,kffr,kilj,klrb,kox3,l4pv,l7vn,lb1j,le7b,lhd3,lkiv,lnon,lquf,lu07,lx5z,m0br,m3hj;;dtu,flu,h19,iro,k71,nct,qil,tod,wu5,zzx,135p,16bh,19h9,1cn4,1sea,1vlp,1yrh,21x9,2531,288t,2bel,2ekd,2hq5,2hvo,2kvx,2o1p,2r7k,36yq,38qs,3a65,3bwk,3dbx,3ghp,3jnh,3mt9,3pz1,3t4t,3wal,3zgd,42m5,45s0,4lj6,4oql,4rwd,4v25,4y7x,4ydg,4ykk,4yro,51dp,51xg,524k,54jh,57p9,5av1,5b0k,5e0t,5h6l,5kcg,603m,61vo,63b1,651g,66gt,69ml,6csd,6fy5,6j3x,6m9p,6pfh,6sl9,6vr1,6yww,7eo2,7hvh,7l19,7o71,7rct,7ric,7uil,7xod,80u5,83zx,875p,8abh,8dhc,8t8i,8v0k,8wfx,8y6c,8zlp,92rh,95x9,9931,9c8t,9fel,9ikd,9ipw,9lq5,9ovx,9s1s,a7sy,ab0d,ae65,ahbx,akhp,annh,aqt9,atz1,ax4t,b0al,b3gd,b6m8,bmde,bo5g,bpkt,brb8,bsql,bvwd,bw1w,bz25,c27x,c5dp,c8jh,cbp9,cev1,cf0k,ci0t,cl6o,d0xu,d459,d7b1,dagt,ddml,dgsd,djy5,dn3x,dq9p,dtfh,dwl9,dzr4,efct,efjx,ehac,eiil,ekg4,elod,em10,eou5,es71,evct,eyil,f1od,f4u5,f7zx,f85g,fb5p,febk,ftx9,fu4d,fx31,g08t,g3el,g6rh,g9x9,gd31,gg8t,gjel,gmkd,gmpw,gmx0,gpq5,gsw0,h8hp,h8ot,h98i,h9tu,hbnh,hcec,hczo,het9,hhz1,hl4t,hlbx,hohp,hrnh,hut9,hxz1,i14t,i1ac,i1hg,i1ok,i1vo,i22s,i4al,i5tw,i7gg,in25,in99,ingd,innh,inul,io02,io76,ioea,iole,iosi,iozm,iq7x,ir7h,irel,irlp,irst,irzx,is71,itdp,iud9,iukd,iurh,iuyl,iv5p,ivct,iwjh,ixj1,ixq5,ixx9,iy4d,iybh,iyil,izp9,j03h,j0al,j0hp,j0ot,j0vx,j131,j1a5,j1h9,j1od,j325,j399,j3gd,j3nh,j3ul,j41p,j48t,j4fx,j4n1,j4u5,j6f1,j6m5,j6t9,j70d,j77h,j7el,j7lp,j7st,j7zx,j9kt,j9rx,j9z1,ja65,jad9,jakd,jarh,jayl,jb5p,jcql,jcxp,jd4t,jdbx,jdj1,jdq5,jdx9,je4d,jebh,jfwd,jg3h,jgal,jghp,jgot,jgvx,jh31,jha5,jhh9,jj25,jj99,jjgd,jjnh,jjul,jk1p,jk8t,jkfx,jkn1,jm80,jmf4,jmm8,jmtc,jn0g,jn7k,jneo,jnls,jnsw,k1ml,k1tp,k20t,k27x,k2f1,k2ki,k4sd,k5rx,k7y5,k8xp,kb3x,kc3h,ke9p,kf99,khml,khtp,ki0t,ki7x,lg5e,lgci,lgjm,lgqq,lgxu,lh4y,ljct,ljjx,ljr1,ljy5,lk59,lkcd,lmil,lmpp,lmwt,ln3x,lnb1,lni5,lpod,lpvh,lq2l,lq9p,lqgt,lqnx,lsu5,lt19,lt8d,ltfh,ltml,lttp;18g,4e8,7k0,aps,dvk,h1c,k74,ncw,qij,tob,wu3,zzv,135n,16bf,19h7,1cmz,1fsw,1iyo,1m4g,1pa8,1sg0,1slg,1vls,1yrk,21xc,252z,288r,2bej,2ekb,2hq3,2kvv,2l1g,2o1n,2r7f,2udc,2xj4,30ow,33uo,370g,3a68,3dc0,3ghs,3jnf,3mt7,3pyz,3t4r,3waj,3zgb,3zlw,42m3,45rv,48xs,4c3k,4f9c,4if4,4lkw,4oqo,4rwg,4v28,4y7v,51dn,54jf,57p7,5auz,5e0r,5h6j,5kcb,5ni8,5qo0,5tts,5wzk,605c,63b4,66gw,69mo,6csb,6fy3,6j3v,6m9n,6pff,6sl7,6vqz,6ywr,722o,758g,78e8,7bk0,7eps,7hvk,7i10,7l1c,7o74,7rcr,7uij,7xob,80u3,83zv,875n,8abf,8dh7,8gn4,8jsw,8myo,8q4g,8ta8,8wg0,8zls,92rk,95x7,992z,9c8r,9fej,9ikb,9lq3,9ovv,9s1n,9v7k,9ydc,a1j4,a4ow,a7uo,ab0g,ae68,ahc0,akhn,annf,aqt7,atyz,ax4r,b0aj,b0gr,b3gb,b6m3,b9s0,bcxs,bg3k,bj9c,bmf4,bpkw,bsqo,bvwg,bz23,c27v,c5dn,c8jf,cbp7,ceuz,cf0k,ci0r,cl6j,cocg,cri8,cuo0,cxts,d0zk,d45c,d7b4,dagw,ddmj,dgsb,djy3,dn3v,dq9n,dtff,dwl7,dzqz,e2ww,e62o,e98g,ece8,efk0,eips,eiv8,elvk,ep1c,es6z,evcr,eyij,f1ob,f4u3,f7zv,fb5n,febf,fhhc,fkn4,fnsw,fqyo,fu4g,fxa8,g0g0,g3ls,g6rf,g9x7,gd2z,gg8r,gjej,gmkb,gpq3,gsvv,gw1s,gz7k,h2dc,h5j4,h8ow,hbuo,hc78,hczo,hf0g,hi68,hlbv,hohn,hrnf,hut7,hxyz,i14r,i1vo,i2o4,i4aj,i7gb,iatc,ib0g,ib7k,ibeo,ibls,ibsw,ic00,ic74,ice8,idz4,ie68,iedc,iekg,ierk,ieyo,if5s,ifcw,ifk0,ih4w,ihc0,ihj4,ihq8,ihxc,ii4g,iibk,iiio,iips,ikao,ikhs,ikow,ikw0,il34,ila8,ilhc,ilog,ilvk,ingg,innk,inuo,io1s,io8w,iog0,ion4,iou8,ip1c,iqm8,iqtc,ir0g,ir7k,ireo,irls,irsw,is00,is74,its0,itz4,iu68,iudc,iukg,iurk,iuyo,iv5s,ivcw,iwxs,ix4w,ixc0,ixj4,ixq8,ixxc,iy4g,iybk,iyio,j03f,j0aj,j0hn,j0or,j0vv,j12z,j1a3,j1h7,j1ob,j397,j3gb,j3nf,j3uj,j41n,j48r,j4fv,j4mz,j4u3,j6ez,j6m3,j6t7,j70b,j77f,j7ej,j7ln,j7sr,j7zv,j9kr,j9rv,j9yz,ja63,jad7,jakb,jarf,jayj,jb5n,jcqj,jcxn,jd4r,jdbv,jdiz,jdq3,jdx7,je4b,jebf,jfwb,jg3f,jgaj,jghn,jgor,jgvv,jh2z,jha3,jhh7,jj23,jj97,jjgb,jjnf,jjuj,jk1n,jk8r,jkfv,jkmz,jm7v,jmez,jmm3,jmt7,jn0b,jn7f,jnej,jnln,jnsr;18a,4e2,7ju,apm,dve,h16,h6s,k6y,ncq,qii,toa,wu2,zzu,135m,16be,19h6,1cna,1fsq,1iyi,1m4a,1pa2,1sfu,1vlm,1vr8,1yre,21x6,252y,288q,2bei,2eka,2hq2,2kvu,2o1m,2r7q,2ud6,2xiy,30oq,33ui,370a,3a62,3abo,3dbu,3ghm,3jne,3mt6,3pyy,3t4q,3wai,3zga,42m2,45s6,48xm,4c3e,4f96,4iey,4lkq,4oqi,4ow4,4rwa,4s1w,4v22,4v7o,4y7u,4ydg,51dm,54je,57p6,5auy,5e0q,5h6i,5kcm,5khw,5ni2,5qnu,5ttm,5wze,6056,63ay,63gk,66gq,69mi,6csa,6fy2,6j3u,6m9m,6pfe,6sl6,6vqy,6yx2,722i,758a,78e2,7bju,7epm,7hve,7i10,7l16,7o6y,7rcq,7uii,7xoa,80u2,83zu,875m,8abe,8dhi,8gmy,8jsq,8myi,8q4a,8ta2,8wfu,8wlg,8zlm,92re,95x6,992y,9c8q,9fei,9ika,9lq2,9ovu,9s1y,9v7e,9yd6,a1iy,a4oq,a7ui,ab0a,ae62,ahbu,akhm,anne,aqt6,atyy,ax4q,b0ai,b3ga,b6me,b9ru,bcxm,bg3e,bj96,bmey,bpkq,bpqc,bsqi,bvwa,bz22,c27u,c5dm,c8je,cbp6,ceuy,ci0q,cl6u,coca,cri2,cunu,cxtm,d0ze,d456,d4as,d7ay,dagq,ddmi,dgsa,djy2,dn3u,dq9m,dtfe,dwl6,dzra,e2wq,e62i,e98a,ece2,efju,eipm,eiv8,elve,ep16,es6y,evcq,eyii,f1oa,f4u2,f7zu,fb5m,febq,fhh6,fkmy,fnsq,fqyi,fu4a,fxa2,fxfo,g0fu,g3lm,g6re,g9x6,gd2y,gg8q,gjei,gmka,gpq2,gsw6,gw1m,gz7e,h2d6,h5iy,h8oq,hbui,hczo,hd6s,hddw,hdl0,hf0a,hgqs,hi62,hjwk,hlbu,hn2c,hohm,hrne,hut6,hxyy,i14q,i4ai,i7gm,iat6,ib0a,ib7e,ibei,iblm,ibsq,ibzu,ic6y,ice2,idyy,ie62,ied6,ieka,iere,ieyi,if5m,ifcq,ifju,ih4q,ihbu,ihiy,ihq2,ihx6,ii4a,iibe,iiii,iipm,ikai,ikhm,ikoq,ikvu,il2y,ila2,ilh6,iloa,ilve,inga,inne,inui,io1m,io8q,iofu,iomy,iou2,ip16,iqm2,iqt6,ir0a,ir7e,irei,irlm,irsq,irzu,is6y,itru,ityy,iu62,iud6,iuka,iure,iuyi,iv5m,ivcq,iwxm,ix4q,ixbu,ixiy,ixq2,ixx6,iy4a,iybe,iyii,j03e,j0ai,j0hm,j0oq,j0vu,j12y,j1a2,j1h6,j1oa,j396,j3ga,j3ne,j3ui,j41m,j48q,j4fu,j4my,j4u2,j6ey,j6m2,j6t6,j70a,j77e,j7ei,j7lm,j7sq,j7zu,j9kq,j9ru,j9yy,ja62,jad6,jaka,jare,jayi,jb5m,jcqi,jcxm,jd4q,jdbu,jdiy,jdq2,jdx6,je4a,jebe,jfwa,jg3e,jgai,jghm,jgoq,jgvu,jh2y,jha2,jhh6,jj22,jj96,jjga,jjne,jjui,jk1m,jk8q,jkfu,jkmy,jm86,jmfa,jmme,jmti,jn0m,jn7q,jneu,jnly,jnt2;18m,26c,4ee,7k6,apy,dvr,h1j,k7b,nd3,qiv,ton,wuf,zyu,134m,13b8,13wh,143l,14ap,14ht,14ox,14w1,16ae,19g6,1cly,1ft2,1gqs,1iyu,1m4m,1pae,1sg7,1vlz,1yrr,21xj,253b,2893,2bev,2eja,2hp2,2hvo,2igx,2io1,2iv5,2j29,2j9d,2jgh,2kuu,2o0m,2r6e,2udi,2vb8,2xja,30p2,33uu,370n,3a6f,3dc7,3dhg,3ghz,3jnr,3mtj,3pzb,3t3q,3w9i,3wg4,3x1d,3x8h,3xfl,3xmp,3xtt,3y0x,3zfa,3zlw,42l2,42ro,45qu,45xg,48xy,4938,4c3q,4c90,4f9i,4ifa,4ll3,4oqv,4rwn,4v2f,4y87,51dz,54jr,57o6,5aty,5b0k,5blt,5bsx,5c01,5c75,5ce9,5cld,5dzq,5e6c,5h5i,5hc4,5kba,5khw,5nie,5qo6,5tty,5wzq,605j,63bb,66h3,69mv,6csn,6fyf,6j47,6m8m,6pee,6pl0,6q69,6qdd,6qkh,6qrl,6qyp,6r5t,6sk6,6vpy,6yvq,722u,758m,78ee,78jo,7bk6,7epz,7hvr,7l1j,7o7b,7ock,7rd3,7uiv,7xon,80t2,83yu,845g,84qp,84xt,854x,85c1,85j5,85q9,874m,8aae,8dg6,8gna,8jt2,8myu,8q4m,8taf,8wg7,8zlz,92rr,95xj,993b,9c93,9fdi,9ija,9ipw,9jb5,9ji9,9jpd,9jwh,9k3l,9kap,9lp2,9ouu,9s0m,9v7q,9ydi,a1ja,a4p2,a7uv,ab0n,ae6f,ahc7,akhz,annr,aqtj,atxy,ax3q,axac,axvl,ay2p,ay9t,aygx,ayo1,ayv5,b09i,b0g4,b3fa,b3lw,b6l2,b6ro,b9s6,bcxy,bg3q,bj9i,bmfb,bpl3,bsqv,bvwn,bw1w,bz2f,c287,c5dz,c8ie,cbo6,cbus,ccg1,ccn5,ccu9,cd1d,cd8h,cdfl,cety,chzq,cl5i,cocm,crie,cuo6,cutg,cxty,d0zr,d45j,d7bb,dah3,ddmv,dgsn,djyf,dn2u,dq8m,dqf8,dr0h,dr7l,drep,drlt,drsx,ds01,dtee,dtl0,dwk6,dwqs,dzpy,dzwk,e2x2,e62u,e98m,ecee,efk7,eipz,elvr,ep1j,es7b,evd3,eyiv,f1na,f4t2,f4zo,f5kx,f5s1,f5z5,f669,f6dd,f6kh,f7yu,fb4m,feae,fhhi,fkna,fnt2,fqyu,fu4n,fxaf,g0g7,g3lz,g6rr,g9xj,gd3b,gg7q,gjdi,gjk4,gmja,gmpw,gpp2,gpvo,gsuu,gt1g,gw1y,gz7q,h2di,h2is,h344,h3wk,h5ja,h8p3,hbuv,hf0n,hi6f,hlc7,hlhg,hlok,hmh0,hohz,hrnr,hus6,hxxy,hy57,hypw,i13q,i22s,i29w,i2h0,i2o4,i2v8,i49i,i58k,i5ms,i610,i7fa,i8ec,i8sk,i96s,iati,ib0m,ib7q,ibeu,ibly,ibt2,ic06,ic7a,icee,idza,ie6e,iedi,iekm,ierq,ieyu,if5y,ifd2,ifk6,ih52,ihc6,ihja,ihqe,ihxi,ii4m,iibq,iiiu,iipy,ikau,ikhy,ikp2,ikw6,il3a,ilae,ilhi,ilom,ilvq,ingn,innr,inuv,io1z,io93,iog7,ionb,iouf,ip1j,iqmf,iqtj,ir0n,ir7r,irev,irlz,irt3,is07,is7b,its7,itzb,iu6f,iudj,iukn,iurr,iuyv,iv5z,ivd3,iwxz,ix53,ixc7,ixjb,ixqf,ixxj,iy4n,iybr,iyiv,j03r,j0av,j0hz,j0p3,j0w7,j13b,j1af,j1hj,j1on,j39j,j3gn,j3nr,j3uv,j41z,j493,j4g7,j4nb,j4uf,j6fb,j6mf,j6tj,j70n,j77r,j7ev,j7lz,j7t3,j807,j9jq,j9qu,j9xy,ja6f,jadj,jakn,jarr,jayv,jb5z,jcpi,jcwm,jd3q,jdau,jdhy,jdp2,jdxj,je4n,jebr,jfva,jg2e,jg9i,jggm,jgnq,jguu,jh1y,jh92,jhg6,jj12,jj86,jjfa,jjme,jjti,jk0m,jk7q,jkeu,jkly,jm6u,jmdy,jml2,jms6,jmza,jn6e,jndi,jnkm,jnrq;17a,4d2,7iu,aon,duf,h07,k5z,nbr,qhj,tne,wt6,zyy,134q,16ai,19ga,1cm2,1frq,1ixi,1m3a,1p93,1sev,1vkn,1yqf,21w7,251z,287u,2bdm,2eje,2hp6,2kuy,2o0q,2r6i,2uc6,2xhy,30nq,33tj,36zb,375w,3a53,3dav,3ggn,3jmf,3msa,3py2,3t3u,3w9m,3zfe,42l6,45qy,48wm,4c2e,4f86,4idz,4ljr,4opj,4rvb,4v13,4y6v,51cq,54ii,57oa,5au2,5dzu,5h5m,5kbe,5klg,5nh2,5qmu,5tsm,5wyf,6047,639z,66fr,69lj,6crb,6fx6,6j2y,6m8q,6pei,6ska,6vq2,6yvu,721i,757a,78d2,7biv,7eon,7huf,7l07,7o5z,7rbr,7uhm,7xne,80t6,83yy,874q,87b8,8aai,8dga,8gly,8jrq,8mxi,8q3b,8t93,8wev,8zkn,92qf,95w7,9922,9c7u,9fdm,9ije,9lp6,9ouy,9s0q,9v6e,9yc6,a1hy,a4nr,a4uz,a7tj,aazb,ae53,ahav,akgn,anmi,aqsa,aty2,ax3u,axac,b09m,b3fe,b6l6,b9qu,bcwm,bg2e,bj87,bmdz,bpjr,bspj,bvvb,bz13,c26y,c5cq,c8ii,cboa,ceu2,chzu,cl5m,coba,crh2,cumu,cxsn,d0yf,d447,d79z,dafr,ddlj,dgre,djx6,dn2y,dn9g,dq8q,dtei,dwka,dzq2,e2vq,e61i,e97a,ecd3,efiv,eion,eluf,ep07,es5z,evbu,eyhm,f1ne,f4t6,f7yy,fb4q,feai,fhg6,fkly,fnrq,fqxj,fu3b,fx93,g0ev,g3kn,g6qf,g9wa,gd22,gg7u,gjdm,gmje,gpp6,gsuy,gw0m,gwzo,gxdw,gxs4,gz6e,h2c6,h5hz,h69w,h72c,h8nr,hbtj,hezb,hi53,hlav,hogq,hrmi,hrt0,hs04,hs78,hsec,hslg,hssk,hszo,ht6s,htdw,husa,hv5w,hvr8,hwck,hxy2,hybo,hyx0,hzic,i13u,i1hg,i22s,i2o4,i49m,i7fe,ias6,iaza,ib6e,ibdi,ibkm,ibrq,ibyu,ic5y,icd2,idxy,ie52,iec6,ieja,ieqe,iexi,if4m,ifbq,ifiu,ih3q,ihau,ihhy,ihp2,ihw6,ii3a,iiae,iihi,iiom,ik9j,ikgn,iknr,ikuv,il1z,il93,ilg7,ilnb,iluf,infb,inmf,intj,io0n,io7r,ioev,iolz,iot3,ip07,iql3,iqs7,iqzb,ir6f,irdj,irkn,irrr,iryv,is5z,itqv,itxz,iu53,iuc7,iujb,iuqf,iuxj,iv4n,ivbr,iwwn,ix3r,ixav,ixhz,ixp3,ixw7,iy3b,iyaf,iyhj,j02f,j09j,j0gn,j0nr,j0uv,j11z,j193,j1g7,j1nb,j38a,j3fe,j3mi,j3tm,j40q,j47u,j4ey,j4m2,j4t6,j6e2,j6l6,j6sa,j6ze,j76i,j7dm,j7kq,j7ru,j7yy,j9ju,j9qy,j9y2,ja56,jaca,jaje,jaqi,jaxm,jb4q,jcpm,jcwq,jd3u,jday,jdi2,jdp6,jdwa,je3e,jeai,jfve,jg2i,jg9m,jggq,jgnu,jguy,jh22,jh96,jhga,jj16,jj8a,jjfe,jjmi,jjtm,jk0q,jk7u,jkey,jkm2,jm6y,jme2,jml6,jmsa,jmze,jn6i,jndm,jnkq,jnru;17e,4d6,7iy,aoo,dug,h08,k60,nbs,qhk,tnc,wt4,zz1,134t,13bw,16al,19gd,1cm5,1fru,1ixm,1m3e,1p94,1sew,1vko,1vr8,1yqg,21w8,2520,287s,2bdk,2ejh,2hp9,2hwc,2kv1,2o0t,2r6l,2uca,2uis,2xi2,30nu,33tk,36zc,3a54,3daw,3ggo,3jmg,3ms8,3py0,3t3x,3w9p,3wgs,3zfh,42l9,42sc,45r1,45y4,48wq,4c2i,4f8a,4ie0,4ljs,4opk,4rvc,4v14,4y6w,51co,54ig,57od,5au5,5b18,5dzx,5e70,5h5p,5hgc,5kbh,5nh6,5qmy,5tsq,5wyg,6048,63a0,66fs,69lk,6crc,6fx4,6j2w,6m8t,6pel,6plo,6skd,6vq5,6yvx,721m,757e,78d6,7biw,7eoo,7ev8,7hug,7l08,7o60,7rbs,7uhk,7xnc,80t9,83z1,8464,874t,8aal,8dgd,8gm2,8jru,8mxm,8q3c,8t94,8wew,8zko,92qg,95w8,9920,9c7s,9fdp,9ijh,9iqk,9lp9,9ov1,9p24,9s0t,9s7w,9v6i,9yca,a1i2,a4ns,a7tk,aazc,ae54,ahaw,akgo,anmg,aqs8,aty5,ax3x,axb0,b09p,b0gs,b3fh,b3q4,b6l9,b9qy,bcwq,bg2i,bj88,bjff,bme0,bpjs,bspk,bvvc,bz14,c26w,c5co,c8il,cbod,cbvg,ceu5,chzx,cl5p,cobe,crh6,cumy,cxso,d0yg,d448,d7a0,dafs,ddlk,dgrc,djx4,dn31,dq8t,dqfw,dtel,dwkd,dzq5,e2vu,e61m,e97e,ecd4,efiw,eioo,elug,ep08,es60,evbs,eyhk,f1nh,f4t9,f50c,f7z1,fb4t,fbbw,feal,feho,fhga,fkm2,fnru,fqxk,fu3c,fx94,g0ew,g3ko,g6qg,g9w8,gd20,gg7x,gjdp,gjks,gmjh,gmqk,gpp9,gpzw,gsv1,gw0q,gz6i,h2ca,h5i0,h5vo,h6h0,h79g,h8ns,hbtk,hezc,hi54,hlaw,hogo,hrmg,husd,hxy5,hy58,hyjg,hyqk,hz4s,hzbw,i13x,i49p,i7fh,iasa,iaze,ib6i,ibdm,ibkq,ibru,ibyy,ic62,icd6,idy2,ie56,ieca,ieje,ieqi,iexm,if4q,ifbu,ifiy,ih3u,ihay,ihi2,ihp6,ihwa,ii3e,iiai,iihm,iioq,ik9k,ikgo,ikns,ikuw,il20,il94,ilg8,ilnc,ilug,infc,inmg,intk,io0o,io7s,ioew,iom0,iot4,ip08,iql4,iqs8,iqzc,ir6g,irdk,irko,irrs,iryw,is60,itqw,ity0,iu54,iuc8,iujc,iuqg,iuxk,iv4o,ivbs,iwwo,ix3s,ixaw,ixi0,ixp4,ixw8,iy3c,iyag,iyhk,j02g,j09k,j0go,j0ns,j0uw,j120,j194,j1g8,j1nc,j388,j3fc,j3mg,j3tk,j40o,j47s,j4ew,j4m0,j4t4,j66w,j6e0,j6l4,j6s8,j6zc,j76g,j7dk,j7ko,j7rs,j7yw,j9ct,j9jx,j9r1,j9y5,ja59,jacd,jajh,jaql,jaxp,jb4t,jcil,jcpp,jcwt,jd3x,jdb1,jdi5,jdp9,jdwd,je3h,jeal,jfod,jfvh,jg2l,jg9p,jggt,jgnx,jgv1,jh25,jh99,jhgd,jiu5,jj19,jj8d,jjfh,jjml,jjtp,jk0t,jk7x,jkf1,jkm5,jlzx,jm71,jme5,jml9,jmsd,jmzh,jn6l,jndp,jnkt,jnrx;17h,1ek,4d9,4kc,7j1,aot,dup,h0h,k69,kdc,nc1,qht,tnl,wtd,zz5,134x,16ap,19gl,1cmd,1frx,1ixp,1m3h,1p99,1sf5,1vkx,1yqp,21wh,2529,2881,2bdt,2ejl,2hpd,2kv5,2o11,2r6t,2ucd,2xi5,30nx,33tp,36zl,3a5d,3db5,3ggx,3jmp,3msh,3py9,3t41,3w9t,3zfl,3zmo,42lh,45r9,48wt,4c2l,4f8d,4ie5,4lk1,4opt,4oww,4rvl,4v1d,4y75,51cx,54ip,57oh,5au9,5e01,5h5x,5kbp,5nh9,5noc,5qn1,5qu4,5tst,5wyl,604h,63a9,66g1,69lt,6crl,6fxd,6j35,6m8x,6pep,6skh,6vqd,6yw5,721p,757h,78d9,7bj1,7eox,7hup,7l0h,7o69,7rc1,7uht,7xnl,80td,83z5,874x,8aat,8dgl,8gm5,8jrx,8mxp,8q3h,8t9d,8wf5,8zkx,92qp,95wh,9929,9c81,9fdt,9ijl,9lpd,9ov9,9s11,9v6l,9ycd,a1i5,a4nx,a7tt,aazl,ab6o,ae5d,ahb5,akgx,anmp,aqsh,aty9,ax41,axb4,b09t,b3fp,b6lh,b9r1,b9y4,bcwt,bd3w,bg2l,bj8d,bme9,bpk1,bspt,bvvl,bz1d,c275,c5cx,c8ip,cboh,ceu9,ci05,cl5x,cobh,crh9,cun1,cxst,d0yp,d44h,d7a9,dag1,ddlt,dgrl,djxd,dn35,dq8x,dtep,dwkl,dzqd,e2vx,e61p,e97h,ecd9,efj5,eiox,elup,ep0h,es69,evc1,eyht,f1nl,f4td,f7z5,fb51,feat,fhgd,fkm5,fnrx,fqxp,fu3l,fx9d,g0f5,g3kx,g6qp,g9wh,gd29,gg81,gjdt,gmjl,gpph,gsv9,gw0t,gz6l,h2cd,h5i5,h8o1,h9nk,hbtt,hc0w,hezl,hi5d,hlb5,hogx,hrmp,ht7k,hush,huzf,hvs0,hxy9,i141,i49x,i7fp,ial9,iasd,iazh,ib6l,ibdp,ibkt,ibrx,ibz1,ic65,icd9,idr1,idy5,ie59,iecd,iejh,ieql,iexp,if4t,ifbx,ifj1,igwt,ih3x,ihb1,ihi5,ihp9,ihwd,ii3h,iial,iihp,iiot,ik2l,ik9p,ikgt,iknx,ikv1,il25,il99,ilgd,ilnh,ilul,in8h,infl,inmp,intt,io0x,io81,iof5,iom9,iotd,ip0h,iqe9,iqld,iqsh,iqzl,ir6p,irdt,irkx,irs1,irz5,is69,itk1,itr5,ity9,iu5d,iuch,iujl,iuqp,iuxt,iv4x,ivc1,iwpt,iwwx,ix41,ixb5,ixi9,ixpd,ixwh,iy3l,iyap,iyht,izvl,j02p,j09t,j0gx,j0o1,j0v5,j129,j19d,j1gh,j1nl,j31d,j38h,j3fl,j3mp,j3tt,j40x,j481,j4f5,j4m9,j4td,j675,j6e9,j6ld,j6sh,j6zl,j76p,j7dt,j7kx,j7s1,j7z5,j9cx,j9k1,j9r5,j9y9,ja5d,jach,jajl,jaqp,jaxt,jb4x,jcip,jcpt,jcwx,jd41,jdb5,jdi9,jdpd,jdwh,je3l,jeap,jfoh,jfvl,jg2p,jg9t,jggx,jgo1,jgv5,jh29,jh9d,jhgh,jiud,jj1h,jj8l,jjfp,jjmt,jjtx,jk11,jk85,jkf9,jkmd,jm05,jm79,jmed,jmlh,jmsl,jmzp,jn6t,jndx,jnl1,jns5;17p,4dh,7j9,ap1,dut,h0l,k6d,nc5,qhv,tnn,wtf,zz7,134z,16ar,19gj,1cmb,1fs5,1ixx,1m3p,1p9h,1sf9,1smc,1vl1,1yqt,21wl,252b,2883,2bdv,2ejn,2hpf,2j36,2kv7,2o0z,2o82,2r6r,2ucl,2xid,30o5,33tx,36zp,3a5h,3db9,3gh1,3jmr,3msj,3pyb,3t43,3w9v,3zfn,42lf,45r7,48x1,4c2t,4f8l,4ied,4lk5,4opx,4rvp,4v1h,4y77,51cz,54ir,57oj,5aub,5e03,5h5v,5kbn,5nhh,5qn9,5tt1,5wyt,604l,63ad,66g5,69lx,6crn,6fxf,6j37,6m8z,6per,6skj,6vqb,6yw3,721x,757p,78dh,7bj9,7ep1,7ew4,7hut,7l0l,7o6d,7rc3,7uhv,7xnn,80tf,83z7,874z,8aar,8ahu,8dgj,8gmd,8js5,8mxx,8q3p,8t9h,8wf9,8zl1,92qt,95wj,992b,9c83,9fdv,9ijn,9lpf,9ov7,9s0z,9v6t,9ycl,a1id,a4o5,a4v8,a7tx,aazp,ae5h,ahb9,akgz,anmr,aqsj,atyb,ax43,ayhu,b09v,b3fn,b6lf,b9r9,bcx1,bg2t,bj8l,bmed,bpk5,bspx,bvvp,bz1f,c277,c5cz,c8ir,cboj,cd2a,ceub,cf1e,ci03,cl5v,cobp,crhh,cun9,cuuc,cxt1,d0yt,d44l,d7ad,dag5,ddlv,dgrn,djxf,dn37,dq8z,drmq,dter,dwkj,dzqb,e2w5,e61x,e97p,ecdh,efj9,eip1,elut,ep0l,es6b,evc3,eyhv,f1nn,f4tf,f676,f6ea,f7z7,f9k2,fb4z,fcpu,fear,fhgl,fkmd,fns5,fqxx,fu3p,fx9h,g0f9,g3l1,g6qr,g9wj,gd2b,gg83,gjdv,gjky,gkrf,gkyq,gl5u,gmjn,gobm,gppf,grhe,gsv7,gw11,gz6t,gzdw,gzs4,h06c,h0dg,h0ro,h2cl,h5id,h8o5,h92c,h99g,h9gk,h9no,h9us,ha1w,ha90,hag4,hbtx,hezp,hi5h,hlb7,hogz,hrmr,husj,hxyb,hzj6,i143,i2oy,i49v,i5uq,i7fn,ialh,iasl,iazp,ib6t,ibdx,ibl1,ibs5,ibz9,ic6d,icdh,idr9,idyd,ie5h,iecl,iejp,ieqt,iexx,if51,ifc5,ifj9,igx1,ih45,ihb9,ihid,ihph,ihwl,ii3p,iiat,iihx,iip1,ik2t,ik9x,ikh1,iko5,ikv9,il2d,il9h,ilgl,ilnp,ilut,in8l,infp,inmt,intx,io11,io85,iof9,iomd,ioth,ip0l,iqed,iqlh,iqsl,iqzp,ir6t,irdx,irl1,irs5,irz9,is6d,itk5,itr9,ityd,iu5h,iucl,iujp,iuqt,iuxx,iv51,ivc5,iwpx,iwx1,ix45,ixb9,ixid,ixph,ixwl,iy3p,iyat,iyhx,izvn,j02r,j09v,j0gz,j0o3,j0v7,j12b,j19f,j1gj,j1nn,j31f,j38j,j3fn,j3mr,j3tv,j40z,j483,j4f7,j4mb,j4tf,j677,j6eb,j6lf,j6sj,j6zn,j76r,j7dv,j7kz,j7s3,j7z7,j9cz,j9k3,j9r7,j9yb,ja5f,jacj,jajn,jaqr,jaxv,jb4z,jcir,jcpv,jcwz,jd43,jdb7,jdib,jdpf,jdwj,je3n,jear,jfoj,jfvn,jg2r,jg9v,jggz,jgo3,jgv7,jh2b,jh9f,jhgj,jiub,jj1f,jj8j,jjfn,jjmr,jjtv,jk0z,jk83,jkf7,jkmb,jm03,jm77,jmeb,jmlf,jmsj,jmzn,jn6r,jndv,jnkz,jns3;17n,4df,7jb,ap3,duv,h0n,h7q,k6f,nc7,qhz,tnr,wtj,zzb,1fs3,1ixv,1m3r,1p9j,1sfb,1vl3,1vs6,1yqv,21wn,252f,2887,2bdz,2ejr,2ucj,2xib,30o7,33tz,36zr,3a5j,3acm,3dbb,3die,3gh3,3go6,3jmv,3jty,3msn,3pyf,3t47,48wz,4c2r,4f8n,4ief,4lk7,4opz,4ox2,4rvr,4v1j,4y7b,51d3,54iv,57on,5nhf,5qn7,5tt3,5wyv,604n,63af,63hi,66g7,69lz,6crr,6fxj,6j3b,6m93,721v,757n,78dj,7bjb,7ep3,7huv,7i1y,7l0n,7l7q,7o6f,7odi,7rc7,7rja,7uhz,7xnr,80tj,8gmb,8js3,8mxz,8q3r,8t9j,8wfb,8wme,8zl3,92qv,95wn,992f,9c87,9fdz,9v6r,9ycj,a1if,a4o7,a7tz,aazr,ab6u,ae5j,aecm,ahbb,ahie,akh3,ako6,anmv,aqsn,atyf,b9r7,bcwz,bg2v,bj8n,bmef,bpk7,bpra,bspz,bvvr,bz1j,c27b,c5d3,c8iv,cobn,crhf,cunb,cxt3,d0yv,d44n,d4bq,d7af,dag7,ddlz,dgrr,djxj,dn3b,e2w3,e61v,e97r,ecdj,efjb,eip3,eiw6,eluv,em1y,ep0n,ep7q,es6f,esdi,evc7,eyhz,f1nr,fhgj,fkmb,fns7,fqxz,fu3r,fx9j,fxgm,g0fb,g3l3,g6qv,g9wn,gd2f,gg87,gw0z,gz6r,h2cn,h5if,h8o7,h9uu,hbtz,hc12,hezr,hi5j,hlbb,hoh3,hrmv,hst4,ht0b,husn,hxyf,ialf,iasj,iazn,ib6r,ibdv,ibkz,ibs3,ibz7,ic6b,icdf,idr7,idyb,ie5f,iecj,iejn,ieqr,iexv,if4z,ifc3,ifj7,igx3,ih47,ihbb,ihif,ihpj,ihwn,ii3r,iiav,iihz,iip3,ik2v,ik9z,ikh3,iko7,ikvb,il2f,il9j,ilgn,ilnr,iluv,in8n,infr,inmv,intz,io13,io87,iofb,iomf,iotj,ip0n,iqef,iqlj,iqsn,iqzr,ir6v,irdz,irl3,irs7,irzb,is6f,itk7,itrb,ityf,iu5j,iucn,iujr,iuqv,iuxz,iv53,ivc7,iwpz,iwx3,ix47,ixbb,ixif,ixpj,ixwn,iy3r,iyav,iyhz,izvr,j02v,j09z,j0h3,j0o7,j0vb,j12f,j19j,j1gn,j1nr,j31j,j38n,j3fr,j3mv,j3tz,j413,j487,j4fb,j4mf,j4tj,j67b,j6ef,j6lj,j6sn,j6zr,j76v,j7dz,j7l3,j7s7,j7zb,j9d3,j9k7,j9rb,j9yf,ja5j,jacn,jajr,jaqv,jaxz,jb53,jciv,jcpz,jcx3,jd47,jdbb,jdif,jdpj,jdwn,je3r,jeav;;ema,ete,hs4,i0t,l6l,ocd,ri5,unx,xtp,10zh,1459,17b1,1agt,1dmo,1tdu,1wl9,1zr1,22wt,262l,298d,2ce5,2fjx,2ipp,2lvh,2p19,2s74,347t,37ya,3b5p,3ebh,3hh9,3kn1,3nst,3qyl,3u4d,3xa5,40fx,43lp,46rk,4ef4,4h7d,4mbm,4miq,4phg,4pq5,4svx,4w1p,4z7h,52d9,55j1,58ot,5bul,5f0d,5i65,5lc0,6136,64al,67gd,6am5,6drx,6gxp,6k3h,6n99,6qf1,6tkt,6wql,6zwg,7fnm,7iv1,7m0t,7p6l,7scd,7vi5,7ynx,81tp,84zh,8859,8bb1,8egw,8u0y,8u82,8x6s,8xfh,90l9,93r1,96wt,9a2l,9d8d,9ge5,9jjx,9mpp,9pvh,9t1c,a8si,abzx,af5p,aibh,alh9,aon1,arst,auyl,ay4d,b1a5,b4fx,b7d0,b7ls,bncy,bqkd,btq5,bwvx,c01p,c37h,c6d9,c9j1,ccot,cful,cj0d,clxg,cm68,cx09,cykh,d1q8,d1xe,d4w4,d54t,d8al,dbgd,dem5,dhrx,dkxp,do3h,dr99,duf1,dxkt,e0hw,e0qo,e6mx,e9sp,ecyh,eghu,ejp9,emv1,eq0t,et6l,ewcd,ezi5,f2nx,f5tp,f8zh,fc59,ffb4,fu9u,fv2a,fxfo,fy9p,g1fh,g4l9,g7r1,gawt,ge2l,gh8d,gke5,gnjx,gqpp,gtvk,h7nm,h88y,h9fm,h9mq,hatg,hbes,hcm3,hcu5,hfzx,hj5p,hmbh,hph9,hsn1,hvst,hyyl,i24d,i39g,i41w,i490,i4uc,i51g,i5a5,i87v,i8g0,im0y,im82,imf6,imma,imte,in0i,in7m,ineq,inlu,insy,io02,ip8d,ipfh,ipml,iptp,iq0t,iq7x,iqf1,iqm5,iqt9,ir0d,ir7h,ise5,isl9,issd,iszh,it6l,itdp,itkt,itrx,itz1,iu65,iud9,ivjx,ivr1,ivy5,iw59,iwcd,iwjh,iwql,iwxp,ix4t,ixbx,ixj1,iypp,iywt,iz3x,izb1,izi5,izp9,izwd,j03h,j0al,j0hp,j0ot,j1vh,j22l,j29p,j2gt,j2nx,j2v1,j325,j399,j3gd,j3nh,j3ul,j519,j58d,j5fh,j5ml,j5tp,j60t,j67x,j6f1,j6m5,j6t9,j70d,j871,j8e5,j8l9,j8sd,j8zh,j96l,j9dp,j9kt,j9rx,j9z1,ja65,jbct,jbjx,jbr1,jby5,jc59,jccd,jcjh,jcql,jcxp,jd4t,jdbx,jeil,jepp,jewt,jf3x,jfb1,jfi5,jfp9,jfwd,jg3h,jgal,jghp,jhod,jhvh,ji2l,ji9p,jigt,jinx,jiv1,jj25,jj99,jjgd,jjnh,jku8,jl1c,jl8g,jlfk,jlmo,jlts,jm0w,jm80,jmf4,jmm8,jmt9;280,550,5ds,8jk,bpc,ev4,i0w,l6o,ocg,ri3,unv,xtn,10zf,1457,17az,1agr,1dmj,1gsg,1jy8,1n40,1q9s,1tfk,1wlc,1zr4,22ww,262j,298b,2ce3,2fjv,2ipn,2lvf,2p17,2s6z,2vcw,2yio,31og,34u8,3800,3b5s,3ebk,3hhc,3kec,3kmz,3nsr,3qyj,3u4b,3xa3,40fv,43ln,46rf,49xc,4d34,4g8w,4jeo,4mkg,4pq8,4sw0,4w1s,4z7f,52d7,55iz,58or,5buj,5f0b,5i63,5lbv,5o90,5ohs,5rnk,5utc,5xz4,614w,64ao,67gg,6am8,6drv,6gxn,6k3f,6n97,6qez,6tkr,6wqj,6zwb,7328,7680,79ds,7cjk,7fpc,7iv4,7m0w,7p6o,7scb,7vi3,7ynv,81tn,84zf,8857,8baz,8egr,8hmo,8ksg,8ny8,8r40,8u9s,8xfk,90lc,93r4,96wr,9a2j,9d8b,9ge3,9jjv,9mpn,9pvf,9t17,9w74,9zcw,a2io,a5og,a8u8,ac00,af5s,aibk,al8k,alh7,aomz,arsr,auyj,ay4b,b1a3,b4fv,b7ln,bark,bdxc,bh34,bk8w,bneo,bqkg,btq8,bww0,c01n,c37f,c6d7,c9iz,ccor,cfuj,cj0b,cm63,cpc0,cshs,cvnk,cytc,d1z4,d54w,d8ao,dbgg,dem3,dhrv,dkxn,do3f,dr97,duez,dxkr,e0qj,e3wg,e728,ea80,edds,egjk,ejpc,emv4,eq0w,et6j,ewcb,ezi3,f2nv,f5tn,f8zf,fc57,ffaz,figw,flmo,fosg,fry8,fv40,fy9s,g1fk,g4lc,g7qz,gawr,ge2j,gh8b,gke3,gnjv,gqpn,gtvf,gx1c,h074,h3cw,h6io,h9og,hatg,hbt0,hc78,hcec,hcu8,hfd0,hg00,hipw,hj5s,hm3f,hmbf,hph7,hsmz,hvsr,hyyj,i24b,i39g,i5a3,i6tg,i7lw,i878,i8fv,i9fk,i9mo,i9ts,ia0w,ia80,iaf4,iam8,iatc,ib0g,ib7k,ibeo,iclc,icsg,iczk,id6o,idds,idkw,ids0,idz4,ie68,iedc,iekg,ifr4,ify8,ig5c,igcg,igjk,igqo,igxs,ih4w,ihc0,ihj4,ihq8,iiww,ij40,ijb4,iji8,ijpc,ijwg,ik3k,ikao,ikhs,ikow,ikw0,im2o,im9s,imgw,imo0,imv4,in28,in9c,ingg,innk,inuo,io1s,ip8g,ipfk,ipmo,ipts,iq0w,iq80,iqf4,iqm8,iqtc,ir0g,ir7k,ise8,islc,issg,iszk,it6o,itds,itkw,its0,itz4,iu68,iudc,ivk0,ivr4,ivy8,iw5c,iwcg,iwjk,iwqo,iwxs,ix4w,ixc0,ixj4,iypn,iywr,iz3v,izaz,izi3,izp7,izwb,j03f,j0aj,j0hn,j0or,j1vf,j22j,j29n,j2gr,j2nv,j2uz,j323,j397,j3gb,j3nf,j3uj,j517,j58b,j5ff,j5mj,j5tn,j60r,j67v,j6ez,j6m3,j6t7,j70b,j86z,j8e3,j8l7,j8sb,j8zf,j96j,j9dn,j9kr,j9rv,j9yz,ja63,jbcr,jbjv,jbqz,jby3,jc57,jccb,jcjf,jcqj,jcxn,jd4r,jdbv,jeij,jepn,jewr,jf3v,jfaz,jfi3,jfp7,jfwb,jg3f,jgaj,jghn,jhob,jhvf,ji2j,ji9n,jigr,jinv,jiuz,jj23,jj97,jjgb,jjnf,jku3,jl17,jl8b,jlff,jlmj,jltn,jm0r,jm7v,jmez,jmm3,jmt7;27u,5dm,8as,8je,bp6,euy,i0q,l6i,oca,ri2,unu,xtm,10ze,1456,17ay,1agq,1dmu,1gsa,1jy2,1mv8,1n3u,1q9m,1tfe,1wl6,1zqy,22wq,262i,298a,2ce2,2fju,2ipm,2lve,2osk,2p16,2ryc,2s7a,2vcq,2yii,31oa,34u2,37zu,3b5m,3ebe,3hh6,3kmy,3nsq,3qyi,3u4a,3xa2,40fu,43d0,43lm,46rq,49x6,4d2y,4g8q,4jei,4mka,4pq2,4svu,4w1m,4z7e,52d6,55iy,58oq,5bui,5f0a,5hxg,5i62,5lc6,5ohm,5rne,5ut6,5xyy,614q,64ai,67ga,6am2,6dru,6gxm,6k3e,6n96,6qey,6tkq,6whw,6wqi,6zno,6zwm,7322,75z8,767u,79dm,7cje,7fp6,7iuy,7m0q,7p6i,7sca,7vi2,7ynu,81tm,84ze,8856,8bay,8eh2,8hmi,8ksa,8ny2,8r3u,8u9m,8xfe,90l6,93qy,96wq,9a2i,9d8a,9ge2,9jju,9mpm,9pms,9pve,9t1i,9w6y,9zcq,a2ii,a5oa,a8u2,abzu,af5m,aibe,alh6,aomy,arsq,auyi,ay4a,b1a2,b4fu,b7ly,bare,bdx6,bh2y,bk8q,bnei,bqka,btq2,bwvu,c01m,c37e,c6d6,c9iy,ccoq,cfui,cj0a,cm6e,cpbu,cs90,cshm,cvne,cyt6,d1yy,d54q,d8ai,dbga,dem2,dhru,dkxm,do3e,dr96,duey,dxkq,e0qu,e3wa,e722,ea7u,eddm,egje,ejp6,emuy,eq0q,et6i,ewca,ezi2,f2nu,f5tm,f8ze,fbwk,fc56,ffba,figq,flmi,fosa,fry2,fv3u,fy9m,g1fe,g2ro,g4l6,g6bo,g7qy,g9ok,gawq,ge2i,gh8a,gke2,gn44,gnju,gqh0,gqpm,gtvq,gwt7,gx16,h06y,h3cq,h6ii,h9oa,hamc,hatg,hcu2,hdz8,he6c,hfzu,hhc4,hj5m,hmbe,ho90,hph6,hres,hrlw,hsmy,huro,hvsq,hy4k,hyyi,i1ok,i24a,i51g,i5a2,i87v,i8g6,i9fe,i9mi,i9tm,ia0q,ia7u,iaey,iam2,iat6,ib0a,ib7e,ibei,icl6,icsa,icze,id6i,iddm,idkq,idru,idyy,ie62,ied6,ieka,ifqy,ify2,ig56,igca,igje,igqi,igxm,ih4q,ihbu,ihiy,ihq2,iiwq,ij3u,ijay,iji2,ijp6,ijwa,ik3e,ikai,ikhm,ikoq,ikvu,im2i,im9m,imgq,imnu,imuy,in22,in96,inga,inne,inui,io1m,ip8a,ipfe,ipmi,iptm,iq0q,iq7u,iqey,iqm2,iqt6,ir0a,ir7e,ise2,isl6,issa,isze,it6i,itdm,itkq,itru,ityy,iu62,iud6,ivju,ivqy,ivy2,iw56,iwca,iwje,iwqi,iwxm,ix4q,ixbu,ixiy,iypm,iywq,iz3u,izay,izi2,izp6,izwa,j03e,j0ai,j0hm,j0oq,j1ve,j22i,j29m,j2gq,j2nu,j2uy,j322,j396,j3ga,j3ne,j3ui,j516,j58a,j5fe,j5mi,j5tm,j60q,j67u,j6ey,j6m2,j6t6,j70a,j86y,j8e2,j8l6,j8sa,j8ze,j96i,j9dm,j9kq,j9ru,j9yy,ja62,jbcq,jbju,jbqy,jby2,jc56,jcca,jcje,jcqi,jcxm,jd4q,jdbu,jeii,jepm,jewq,jf3u,jfay,jfi2,jfp6,jfwa,jg3e,jgai,jghm,jhoa,jhve,ji2i,ji9m,jigq,jinu,jiuy,jj22,jj96,jjga,jjne,jkue,jl1i,jl8m,jlfq,jlmu,jlty,jm12,jm86,jmfa,jmme,jmti;286,5dy,8jq,bpi,emc,evb,hs4,i13,kxw,l6v,o3o,ocn,rif,uo7,xtz,10qs,10ye,11xd,124h,12bl,12ip,12pt,1341,13b5,13i9,13pd,1446,179y,1afq,1dli,1gjo,1gsm,1jye,1n46,1q9y,1t6s,1tfr,1wck,1wlj,1zic,1zrb,22o4,22x3,262v,298n,2cef,2ebo,2fiu,2ght,2gox,2gw1,2h35,2ha9,2hhg,2hoh,2hvl,2i2p,2i9t,2iom,2lue,2p06,2s5y,2vd2,2yiu,31om,34ue,37r8,3807,3b5z,3ebr,3hhj,3knb,3nt3,3qyv,3u3a,3v29,3v9d,3vgh,3vnl,3vup,3w2j,3w8x,3wg1,3wn5,3wu9,3x92,40eu,43km,46qe,49xi,4d3a,4g92,4jeu,4mbo,4mkn,4pqf,4sw7,4w1z,4z7r,52dj,55jb,58nq,59mp,59tt,5a0x,5a81,5af5,5atd,5b0h,5b7l,5bep,5bti,5eza,5i52,5lau,5o90,5ohy,5res,5rnq,5uti,5xza,60w4,6153,641w,64av,677o,67gn,6adg,6amf,6ds7,6gxz,6k3r,6n0k,6n86,6o75,6oe9,6old,6osh,6ozl,6pdt,6pkx,6ps1,6pz5,6qdy,6tjq,6wpi,6zva,732e,7686,79dy,7cjq,7fgk,7fpj,7imc,7ivb,7ls4,7m13,7oxw,7p6v,7scn,7vif,7yo7,81tz,82rl,82yp,835t,83cx,83k1,83y9,845d,84ch,84jl,84ye,8846,8b9y,8efq,8hmu,8ksm,8nye,8r46,8u10,8u9z,8xfr,90lj,93rb,96x3,9a2v,9d8n,9gef,9hc1,9hj5,9hq9,9hxd,9i4h,9iip,9ipt,9iwx,9j41,9jk7,9mom,9pue,9t06,9w7a,9zd2,a2iu,a5om,a8lg,a8uf,ac07,af5z,aibr,alhj,aonb,art3,atqc,auyv,avwh,aw3l,awap,awhu,awp0,ax35,axa9,axhd,axoh,ay4n,azno,b192,b4eu,b7km,barq,bdxi,bh3a,bk92,bnev,bqkn,btqf,bww7,c01z,c37r,c6dj,c9ac,c9jb,cagx,cao1,cav5,cb29,cb9d,cbgh,cbnl,cbup,cc1t,cc8x,ccp3,cfti,ciza,cm52,cpc6,cshy,cvnq,cyti,d1zb,d553,d8av,dbgn,demf,dhs7,dkxz,do3r,dp1d,dp8h,dpfl,dpmp,dptt,dq0x,dq81,dqf5,dqm9,dqtd,dr9j,dufb,dxjq,e0pi,e3wm,e72e,ea86,eddy,egjr,ejpj,emvb,eq13,et6v,ewcn,ezif,f2o7,f3lt,f3sx,f401,f475,f4e9,f4ld,f4sh,f4zl,f56p,f5dt,f5tz,f8zr,fc46,ff9y,fih2,flmu,fosm,frye,fv47,fy9z,g1fr,g4lj,g7rb,gax3,ge2v,gh8n,gidd,gikh,girl,giyp,gj5t,gjcx,gjk1,gjr5,gjy9,gkef,gnk7,gqom,gtue,gx1i,h07a,h1j8,h2bo,h3d2,h62s,h69w,h6iu,h9gb,h9on,hcuf,hg07,hj5z,hkas,hl38,hlok,hmbr,houc,hphj,hs3o,hs78,hsez,hsnb,hvt3,hwxt,hyyv,hzwk,i0bf,i0hw,i24n,i592,i8eu,i9fq,i9mu,i9ty,ia12,ia86,iafa,iame,iati,ib0m,ib7q,ibeu,icli,icsm,iczq,id6u,iddy,idl2,ids6,idza,ie6e,iedi,iekm,ifra,ifye,ig5i,igcm,igjq,igqu,igxy,ih52,ihc6,ihja,ihqe,iix2,ij46,ijba,ijie,ijpi,ijwm,ik3q,ikau,ikhy,ikp2,ikw6,im2v,im9z,imh3,imo7,imvb,in2f,in9j,ingn,innr,inuv,io1z,ip8n,ipfr,ipmv,iptz,iq13,iq87,iqfb,iqmf,iqtj,ir0n,ir7r,isef,islj,issn,iszr,it6v,itdz,itl3,its7,itzb,iu6f,iudj,ivk7,ivrb,ivyf,iw5j,iwcn,iwjr,iwqv,iwxz,ix53,ixc7,ixjb,iypz,iyx3,iz47,izbb,izif,izpj,izwn,j03r,j0av,j0hz,j0p3,j1vr,j22v,j29z,j2h3,j2o7,j2vb,j32f,j39j,j3gn,j3nr,j3uv,j51j,j58n,j5fr,j5mv,j5tz,j613,j687,j6fb,j6mf,j6tj,j87b,j8ef,j8lj,j8sn,j8zr,j96v,j9dz,j9l3,j9s7,j9zb,ja6f,jbd3,jbk7,jbrb,jbyf,jc5j,jccn,jcjr,jcqv,jcxz,jd53,jdc7,jehi,jeom,jevq,jf2u,jf9y,jfh2,jfo6,jfwn,jg3r,jgav,jghz,jhna,jhue,ji1i,ji8m,jifq,jimu,jity,jj12,jj86,jjfa,jjme,jkt2,jl06,jl7a,jlee,jlli,jlsm,jlzq,jm6u,jmdy,jml2,jms6;26u,5cm,8ie,bo7,etz,hzr,l5j,obb,rh3,umy,xsq,10yi,144a,17a2,1afu,1dlm,1gra,1jx2,1n2u,1q8n,1tef,1wk7,1zic,1zpz,22vr,261j,297e,2cd6,2fiy,2ioq,2lui,2p0a,2s62,2vbq,2yhi,31fo,31na,34t3,37yv,3b4n,3eaf,3hg7,3klz,3nru,3qxm,3u3e,3x96,40ey,43kq,46qi,49w6,4d1y,4g7q,4jdj,4mjb,4pp3,4suv,4w0n,4z6f,52ca,55i2,58nu,5btm,5eze,5i56,5lay,5ogm,5rme,5us6,5xxz,613r,649j,67fb,6adg,6al3,6dqv,6gwq,6k2i,6n8a,6qe2,6tju,6wpm,6zve,7312,766u,79cm,7cif,7fo7,7itz,7lzr,7p5j,7sbb,7vh6,7ymy,81sq,84yi,884a,8ba2,8efu,8hli,8kra,8npg,8nx2,8r2v,8u8n,8xef,90k7,93pz,96vr,9a1m,9d7e,9gd6,9jiy,9moq,9pui,9t0a,9w5y,9zbq,a2hi,a5nb,a8t3,abyv,af4n,aiaf,al97,alg7,aom2,arru,auxm,ay3e,b196,b4ey,b7kq,baqe,bdw6,bh1y,bk7r,bndj,bqjb,btp3,bwuv,c00n,c36i,c6ca,c9i2,ccnu,cftm,cize,cm56,cpau,csgm,cvme,cys7,d1xz,d53r,d89j,dbfb,del3,dhqy,dkwq,do2i,dr8a,due2,dxju,e0pm,e3va,e712,ea6u,edcn,egif,ejo7,emtz,epzr,et5j,ewbe,ezh6,f2my,f5sq,f8yi,fc4a,ffa2,fifq,flli,fojo,fora,frx3,fv2v,fy8n,g1ef,g4k7,g7pz,gavu,ge1m,gh7e,gkd6,gniy,gqoq,gtui,gx06,h05y,h1c4,h24k,h34r,h3bq,h6hj,h9nb,hct3,hfyv,hj4n,hm2s,hmaf,hp1g,hp8k,hpga,hqf8,hqmc,hqtg,hr0k,hrlw,hrt0,hs04,hs78,hsm2,hts4,hudg,hvru,hwxw,hxj8,hyxm,i03o,i0p0,i23e,i596,i8ey,i9ee,i9li,i9sm,i9zq,ia6u,iady,ial2,ias6,iaza,ib6e,ibdi,ick6,icra,icye,id5i,idcm,idjq,idqu,idxy,ie52,iec6,ieja,ifpy,ifx2,ig46,igba,igie,igpi,igwm,ih3q,ihau,ihhy,ihp2,iivr,ij2v,ij9z,ijh3,ijo7,ijvb,ik2f,ik9j,ikgn,iknr,ikuv,im1j,im8n,imfr,immv,imtz,in13,in87,infb,inmf,intj,io0n,ip7b,ipef,iplj,ipsn,ipzr,iq6v,iqdz,iql3,iqs7,iqzb,ir6f,isd3,isk7,isrb,isyf,it5j,itcn,itjr,itqv,itxz,iu53,iuc7,iviv,ivpz,ivx3,iw47,iwbb,iwif,iwpj,iwwn,ix3r,ixav,ixhz,iyon,iyvr,iz2v,iz9z,izh3,izo7,izvb,j02f,j09j,j0gn,j0nr,j1ui,j21m,j28q,j2fu,j2my,j2u2,j316,j38a,j3fe,j3mi,j3tm,j50a,j57e,j5ei,j5lm,j5sq,j5zu,j66y,j6e2,j6l6,j6sa,j6ze,j862,j8d6,j8ka,j8re,j8yi,j95m,j9cq,j9ju,j9qy,j9y2,ja56,jbbu,jbiy,jbq2,jbx6,jc4a,jcbe,jcii,jcpm,jcwq,jd3u,jday,jehm,jeoq,jevu,jf2y,jfa2,jfh6,jfoa,jfve,jg2i,jg9m,jggq,jhne,jhui,ji1m,ji8q,jifu,jimy,jiu2,jj16,jj8a,jjfe,jjmi,jkt6,jl0a,jl7e,jlei,jllm,jlsq,jlzu,jm6y,jme2,jml6,jmsa;26y,5cq,8ii,bo8,eu0,hzs,l5k,o3o,obc,rh4,umw,xso,10yl,144d,17a5,1afx,1dek,1dlp,1gre,1jx6,1n2y,1q8o,1teg,1wk8,1zq0,22vs,261k,297c,2cd4,2fj1,2iot,2lul,2p0d,2s65,2vbu,2yhm,31ne,34t4,37yw,3b4o,3eag,3hg8,3km0,3nrs,3qxk,3u3h,3x99,40f1,43kt,46ql,49wa,4d22,4g7u,4jdk,4mjc,4pp4,4suw,4w0o,4z6g,52c8,55i0,58nx,5btp,5ezh,5i59,5l3w,5lb1,5ogq,5rmi,5ukk,5usa,5xy0,613s,649k,67fc,6adg,6al4,6dqw,6gwo,6k2g,6n8d,6qe5,6tjx,6wpp,6zvh,7316,766y,7950,79cq,7cig,7fo8,7iu0,7lzs,7p5k,7sbc,7vh4,7ymw,81st,84yl,884d,8ba5,8efx,8hlm,8kre,8nx6,8r2w,8u8o,8xeg,90k8,93q0,96o4,96vs,9a1k,9d7c,9gd9,9jj1,9mot,9pul,9t0d,9w62,9zbu,a2hm,a5nc,a8t4,abyw,af4o,aiag,alg8,aom0,arrs,auxp,ay3h,b199,b4f1,b7kt,baqi,bdwa,bh22,bk7s,bndk,bqjc,btp4,bwuw,c00o,c2ys,c36g,c6c8,c9i5,ccnx,cftp,cizh,cm59,cpay,csgq,cvmi,cys8,d1y0,d53s,d89k,dbfc,del4,dhqw,dkwo,do2l,dr8d,due5,dxjx,e0pp,e3ve,e716,e9z8,ea6y,edco,egig,ejo8,emu0,epzs,et5k,ewbc,ez9g,ezh4,f2n1,f5st,f8yl,fc4d,ffa5,fifu,fllm,fojo,fore,frx4,fv2w,fy8o,g1eg,g4k8,g7q0,gavs,ge1k,gh7h,gkd9,gnj1,gqot,gtul,gx0a,h062,h3bu,h4w4,h5ok,h6hk,h9nc,hct4,hfyw,hj4o,hmag,hpg8,hsez,hsm0,hvdo,hvrx,hwyk,hx5o,hxr0,hy58,hyxp,i23h,i599,i8f1,i9ei,i9lm,i9sq,i9zu,ia6y,iae2,ial6,iasa,iaze,ib6i,ibdm,icka,icre,icyi,id5m,idcq,idju,idqy,idy2,ie56,ieca,ieje,ifq2,ifx6,ig4a,igbe,igii,igpm,igwq,ih3u,ihay,ihi2,ihp6,iivs,ij2w,ija0,ijh4,ijo8,ijvc,ik2g,ik9k,ikgo,ikns,ikuw,im1k,im8o,imfs,immw,imu0,in14,in88,infc,inmg,intk,io0o,ip7c,ipeg,iplk,ipso,ipzs,iq6w,iqe0,iql4,iqs8,iqzc,ir6g,isd4,isk8,isrc,isyg,it5k,itco,itjs,itqw,ity0,iu54,iuc8,iviw,ivq0,ivx4,iw48,iwbc,iwig,iwpk,iwwo,ix3s,ixaw,ixi0,iyoo,iyvs,iz2w,iza0,izh4,izo8,izvc,j02g,j09k,j0go,j0ns,j1ug,j21k,j28o,j2fs,j2mw,j2u0,j314,j388,j3fc,j3mg,j3tk,j508,j57c,j5eg,j5lk,j5so,j5zs,j66w,j6e0,j6l4,j6s8,j6zc,j865,j8d9,j8kd,j8rh,j8yl,j95p,j9ct,j9jx,j9r1,j9y5,ja59,jbbx,jbj1,jbq5,jbx9,jc4d,jcbh,jcil,jcpp,jcwt,jd3x,jdb1,jehp,jeot,jevx,jf31,jfa5,jfh9,jfod,jfvh,jg2l,jg9p,jggt,jhnh,jhul,ji1p,ji8t,jifx,jin1,jiu5,jj19,jj8d,jjfh,jjml,jkt9,jl0d,jl7h,jlel,jllp,jlst,jlzx,jm71,jme5,jml9,jmsd;271,5ct,8il,bod,eu9,i01,l5t,o4g,obl,rhd,un5,xsx,10yp,144h,17a9,1ag5,1dlx,1grh,1jx9,1n31,1q8t,1tep,1wkh,1zq9,22w1,261t,297l,2cdd,2fj5,2iox,2lup,2p0l,2s6d,2vbx,2yhp,31nh,34t9,37z5,3b4x,3eap,3hgh,3km9,3ns1,3qxt,3u3l,3x9d,40f5,43l1,46qt,49wd,4d25,4g7x,4jdp,4mjl,4ppd,4sv5,4vts,4w0x,4z6p,52ch,55i9,58o1,5btt,5ezl,5i5h,5lb9,5ogt,5rml,5usd,5xy5,6141,649t,67fl,6ald,6dr5,6gwx,6k2p,6n8h,6qe9,6tk1,6wpx,6zvp,7319,7671,79ct,7cil,7foh,7iu9,7m01,7p5t,7sbl,7vhd,7yn5,81sx,84yp,884h,8bad,8eg5,8hek,8hlp,8krh,8nx9,8r31,8u8x,8xep,90kh,93q9,96w1,9a1t,9d7l,9gdd,9jj5,9mox,9put,9t0l,9w65,9zbx,a2hp,a5nh,a8td,abz5,af4x,aiap,al9c,algh,aom9,ars1,auxt,ay3l,b19d,b4f9,b7l1,baql,bdp8,bdwd,bh25,bk7x,bndt,bqjl,btpd,bwv5,c00x,c36p,c6ch,c9i9,cco1,cftt,cizp,cm5h,cpb1,csgt,cvml,cysd,d1y9,d541,d89t,dbfl,deld,dhr5,dkwx,do2p,dr8h,due9,dxk5,e0px,e3vh,e719,e9zw,ea71,edct,egip,ejoh,emu9,eq01,et5t,ewbl,ezhd,f2n5,f5sx,f8yp,fc4l,ffad,fifx,fllp,forh,frx9,fv35,fy8x,g1ep,g4kh,g7q9,gaow,gaw1,ge1t,gh7l,gkdd,gnj5,gqp1,gtut,gx0d,h065,h3bx,h6ak,h6hp,h7hc,h8o0,h9nl,hbxc,hctd,hfz5,hj4x,hmap,hpgh,hr1c,hrts,hsm9,hvs1,hyxt,i23l,i59h,i8f9,i9el,i9lp,i9st,i9zx,ia71,iae5,ial9,iasd,iazh,ib6l,ibdp,ickd,icrh,icyl,id5p,idct,idjx,idr1,idy5,ie59,iecd,iejh,ifq5,ifx9,ig4d,igbh,igil,igpp,igwt,ih3x,ihb1,ihi5,ihp9,iivx,ij31,ija5,ijh9,ijod,ijvh,ik2l,ik9p,ikgt,iknx,ikv1,im1t,im8x,img1,imn5,imu9,in1d,in8h,infl,inmp,intt,io0x,ip7l,ipep,iplt,ipsx,iq01,iq75,iqe9,iqld,iqsh,iqzl,ir6p,isdd,iskh,isrl,isyp,it5t,itcx,itk1,itr5,ity9,iu5d,iuch,ivj5,ivq9,ivxd,iw4h,iwbl,iwip,iwpt,iwwx,ix41,ixb5,ixi9,iyox,iyw1,iz35,iza9,izhd,izoh,izvl,j02p,j09t,j0gx,j0o1,j1up,j21t,j28x,j2g1,j2n5,j2u9,j31d,j38h,j3fl,j3mp,j3tt,j50h,j57l,j5ep,j5lt,j5sx,j601,j675,j6e9,j6ld,j6sh,j6zl,j869,j8dd,j8kh,j8rl,j8yp,j95t,j9cx,j9k1,j9r5,j9y9,ja5d,jbc1,jbj5,jbq9,jbxd,jc4h,jcbl,jcip,jcpt,jcwx,jd41,jdb5,jeht,jeox,jew1,jf35,jfa9,jfhd,jfoh,jfvl,jg2p,jg9t,jggx,jhnp,jhut,ji1x,ji91,jig5,jin9,jiud,jj1h,jj8l,jjfp,jjmt,jkth,jl0l,jl7p,jlet,jllx,jlt1,jm05,jm79,jmed,jmlh,jmsl;204,279,5d1,8it,bol,eud,i05,l5x,obp,rhf,un7,xsz,10yr,144j,17ab,1ag3,1dlv,1gkk,1grp,1jxh,1n39,1q91,1tet,1wkl,1zqd,22w5,261v,297n,2cdf,2fj7,2ioz,2lur,2p0j,2s6b,2vc5,2yhx,31np,34th,37z9,3b51,3eat,3hgl,3kmb,3ns3,3qxv,3u3n,3x9f,40f7,43kz,46qr,49wl,4d2d,4g85,4jdx,4mjp,4pph,4sv9,4w11,4z6r,52cj,55ib,58o3,5ag2,5bmq,5btv,5ezn,5i5f,5lb7,5oh1,5rmt,5usl,5xyd,6145,649x,67fp,6alh,6dr7,6gwz,6k2r,6n8j,6qeb,6tk3,6wpv,6zvn,731h,7604,7679,79d1,7cit,7fol,7iud,7m05,7p5x,7sbn,7vhf,7yn7,81sz,84rm,84yr,884j,8bab,8eg3,8hlx,8kkk,8krp,8nxh,8r39,8u91,8xet,90kl,93qd,96w3,9a1v,9d7n,9gdf,9jc2,9jj7,9moz,9pur,9t0j,9w6d,9zc5,a2hx,a5np,a8th,abz9,af51,aiat,algj,aomb,ars3,auxv,ay3n,b19f,b4f7,b7kz,baqt,bdwl,bh2d,bk85,bndx,bqjp,btph,bwv9,c00z,c36r,c6cj,c9ib,ccgy,cco3,cftv,cizn,cm5f,cpb9,csh1,cvmt,cysl,d1yd,d545,d89x,dbfp,delf,dhr7,dkwz,do2r,dpuq,dr8j,dueb,dxk3,e0pv,e3vp,e71h,ea79,edd1,egit,ejol,emud,eq05,et5v,ewbn,ezhf,f2n7,f4f6,f4ma,f5lu,f5sz,f8yr,fc4j,ffab,fig5,fles,fllx,forp,frxh,fv39,fy91,g1et,g4kl,g7qb,gaw3,ge1v,gh7n,gkdf,gnj7,gqoz,gtur,gx0l,gy04,gy78,gylg,gyzo,gz6s,gzl0,gzyz,h06d,h3c5,h6hx,h7hg,h7ok,h7vo,h82s,h89w,h8h0,h8o4,h8v8,h9np,hcth,hfz9,hj51,hmar,hpgj,hsmb,hvs3,hyxv,i23n,i59f,i8f7,i9et,i9lx,i9t1,ia05,ia79,iaed,ialh,iasl,iazp,ib6t,ibdx,ickl,icrp,icyt,id5x,idd1,idk5,idr9,idyd,ie5h,iecl,iejp,ifqd,ifxh,ig4l,igbp,igit,igpx,igx1,ih45,ihb9,ihid,ihph,iiw5,ij39,ijad,ijhh,ijol,ijvp,ik2t,ik9x,ikh1,iko5,ikv9,im1x,im91,img5,imn9,imud,in1h,in8l,infp,inmt,intx,io11,ip7p,ipet,iplx,ipt1,iq05,iq79,iqed,iqlh,iqsl,iqzp,ir6t,isdh,iskl,isrp,isyt,it5x,itd1,itk5,itr9,ityd,iu5h,iucl,ivj9,ivqd,ivxh,iw4l,iwbp,iwit,iwpx,iwx1,ix45,ixb9,ixid,iyoz,iyw3,iz37,izab,izhf,izoj,izvn,j02r,j09v,j0gz,j0o3,j1ur,j21v,j28z,j2g3,j2n7,j2ub,j31f,j38j,j3fn,j3mr,j3tv,j50j,j57n,j5er,j5lv,j5sz,j603,j677,j6eb,j6lf,j6sj,j6zn,j86b,j8df,j8kj,j8rn,j8yr,j95v,j9cz,j9k3,j9r7,j9yb,ja5f,jbc3,jbj7,jbqb,jbxf,jc4j,jcbn,jcir,jcpv,jcwz,jd43,jdb7,jehv,jeoz,jew3,jf37,jfab,jfhf,jfoj,jfvn,jg2r,jg9v,jggz,jhnn,jhur,ji1v,ji8z,jig3,jin7,jiub,jj1f,jj8j,jjfn,jjmr,jktf,jl0j,jl7n,jler,jllv,jlsz,jm03,jm77,jmeb,jmlf,jmsj;277,5cz,8iv,bhi,bon,euf,i07,l5z,obr,rhj,unb,xt3,10yv,1grn,1jxf,1n3b,1q93,1tev,1wkn,1zqf,22w7,25uu,261z,297r,2cdj,2fjb,2vc3,2yhv,31nr,34tj,37zb,3b53,3eav,3hgn,3kmf,3ns7,3qxz,3u3r,49wj,4d2b,4g87,4jdz,4mjr,4ppj,4svb,4w13,4z6v,52cn,55if,58o7,5ogz,5rmr,5usn,5xyf,6147,649z,67fr,6alj,6drb,6gx3,6k2v,6n8n,731f,7677,79d3,7cbq,7civ,7fon,7iuf,7m07,7p5z,7s4m,7sbr,7vhj,7ynb,81t3,8hlv,8krn,8nxj,8r3b,8u93,8xev,90kn,93qf,96w7,9a1z,9d7r,9gdj,9w6b,9zc3,a2hz,a5nr,a8tj,abzb,af53,aiav,algn,aomf,ars7,auxz,baqr,bdwj,bh2f,bk87,bndz,bqjr,btpj,bwvb,c013,c36v,c6cn,c9if,cpb7,csgz,cvmv,cysn,d1yf,d547,d89z,dbfr,deee,delj,dhrb,dkx3,do2v,e3vn,e71f,ea7b,ed5y,edd3,egiv,ejon,emuf,eq07,et5z,ewbr,ezhj,f2nb,fig3,fllv,forr,frxj,fv3b,fy93,g1ev,g4kn,g7qf,gaw7,ge1z,gh7r,gx0j,h06b,h3c7,h6hz,h7om,h8nv,h9nr,hctj,hfzb,hj53,hlie,hmav,ho9y,hpgn,hr1i,hsmf,hvs7,i9er,i9lv,i9sz,ia03,ia77,iaeb,ialf,iasj,iazn,ib6r,ibdv,ickj,icrn,icyr,id5v,idcz,idk3,idr7,idyb,ie5f,iecj,iejn,ifqf,ifxj,ig4n,igbr,igiv,igpz,igx3,ih47,ihbb,ihif,ihpj,iiw7,ij3b,ijaf,ijhj,ijon,ijvr,ik2v,ik9z,ikh3,iko7,ikvb,im1z,im93,img7,imnb,imuf,in1j,in8n,infr,inmv,intz,io13,ip7r,ipev,iplz,ipt3,iq07,iq7b,iqef,iqlj,iqsn,iqzr,ir6v,isdj,iskn,isrr,isyv,it5z,itd3,itk7,itrb,ityf,iu5j,iucn,ivjb,ivqf,ivxj,iw4n,iwbr,iwiv,iwpz,iwx3,ix47,ixbb,ixif,iyp3,iyw7,iz3b,izaf,izhj,izon,izvr,j02v,j09z,j0h3,j0o7,j1uv,j21z,j293,j2g7,j2nb,j2uf,j31j,j38n,j3fr,j3mv,j3tz,j50n,j57r,j5ev,j5lz,j5t3,j607,j67b,j6ef,j6lj,j6sn,j6zr,j86f,j8dj,j8kn,j8rr,j8yv,j95z,j9d3,j9k7,j9rb,j9yf,ja5j,jbc7,jbjb,jbqf,jbxj,jc4n,jcbr,jciv,jcpz;;0;37d0,37k4,37r8,37yc,385g,4lxg,4m4k,4mbo,4mis,4mpw,60hw,60p0,60w4,6138,61ac,7f2c,7f9g,7fgk,7fno,7fus,8tms,8ttw,8u10,8u84,8uf8,a878,a8ec,a8lg,a8sk,a8zo,bmro,bmys,bn5w,bnd0,bnk4,d1c4,d1j8,d1qc,d1xg,d24k,efwk,eg3o,egas,eghw,egp0,fuh0,fuo4,fuv8,fv2c,fv9g,h91g,h98k,h9fo,h9ms,h9tw,inlw,int0,io04,io78,ioec,k26c,k2dg,k2kk,k2ro,k2ys,lgqs,lgxw,lh50,lhc4,lhj8;;;;e84,ef8,emc,etg,f0k,1ssk,1szo,1t6s,1tdw,1tl0,37d0,37k4,37r8,37yc,385g,4lxg,4m4k,4mbo,4mis,4mpw,60hw,60p0,60w4,6138,61ac,7f2c,7f9g,7fgk,7fno,7fus,8tms,8ttw,8u10,8u84,8uf8,a878,a8ec,a8lg,a8sk,a8zo,bmro,bmys,bn5w,bnd0,bnk4,d1c4,d1j8,d1qc,d1xg,d24k,efwk,eg3o,egas,eghw,egp0,fuh0,fuo4,fuv8,fv2c,fv9g,h91g,h98k,h9fo,h9ms,h9tw,inlw,int0,io04,io78,ioec";
+	</script>
+	<!-- Main -->
+	<script type="application/javascript">
+	
+// Setup
+var canvas = document.getElementById("overlay");
+var ctx = canvas.getContext("2d");
+var savebox = document.getElementById("savebox");
+var saveDirections = document.getElementById("savedirections");
+var message = document.getElementById("message");
+ctx.canvas.width = window.innerWidth;
+ctx.canvas.height = window.innerHeight;
+var MathGlob = Math;
+
+function MineKhan() {
+	let Math = MathGlob;
+	let setPixel, getPixels;
+	let textures = {
+		grassTop: function(n) {
+			let r = 0,
+				g = 0,
+				b = 0,
+				d = 0;
+			for (let x = 0; x < 16; x++) {
+				for (let y = 0; y < 16; y++) {
+					d = Math.random() * 0.25 + 0.65;
+					r = 0x54 * d;
+					g = 0xa0 * d;
+					b = 0x48 * d;
+					setPixel(n, x, y, r, g, b);
+				}
+			}
+		},
+		grassSide: function(n) {
+			let r = 0,
+				g = 0,
+				b = 0,
+				d = 0;
+			let pix = getPixels("0g0g70ordrzz0u30g730wa4vzz0xnyl8f11lrk7315qj7jz1fh47pb6553365533033636350335403653650063306333633300635163503655353653535605335031350330553500033033366333433663663535336655335055335553353530355333033503300333336635353663650660554353355635155305303053556333333366353323553060365553063030663533555365534355335530");
+			for (let i = 0; i < pix.length; i += 4) {
+				setPixel(n, i >> 2 & 15, i >> 6, pix[i], pix[i + 1], pix[i + 2], pix[i + 3]);
+			}
+			for (let x = 0; x < 16; x++) {
+				let m = Math.random() * 4 + 1;
+				for (let y = 0; y < m; y++) {
+					d = Math.random() * 0.25 + 0.65;
+					r = 0x54 * d;
+					g = 0xa0 * d;
+					b = 0x48 * d;
+					setPixel(n, x, y, r, g, b);
+				}
+			}
+		},
+		leaves: function(n) {
+			let r = 0,
+				g = 0,
+				b = 0,
+				a = 0;
+			for (let x = 0; x < 16; x++) {
+				for (let y = 0; y < 16; y++) {
+					r = 0;
+					g = Math.floor(Math.random() * 30 + 100);
+					b = Math.floor(Math.random() * 30);
+					if (Math.random() < 0.35) {
+						a = 0;
+					} else {
+						a = 255;
+					}
+					setPixel(n, x, y, r, g, b, a);
+				}
+			}
+		},
+		oakPlanks: function(n) {
+			let r = 0;
+			for (let y = 0; y < 16; y++) {
+				let a = (y & 3) === 3 ? 0.7 : 1;
+				for (let x = 0; x < 16; x++) {
+					let mid = x === 8 && (y & 7) > 3 && a === 1 ? 0.85 : 1;
+					let rit = x === 15 && (y & 7) < 3 && a === 1 ? 0.85 : 1;
+					r = (Math.random() * 0.1 + 0.9) * a * mid * rit;
+					setPixel(n, x, y, 190 * r, 154 * r, 96 * r);
+				}
+			}
+		},
+		hitbox: function(n) {
+			for (let x = 0; x < 16; x++) {
+				for (let y = 0; y < 16; y++) {
+					setPixel(n, x, y, 0, 0, 0, 255);
+				}
+			}
+		},
+		dirt: "0g0g70ordrzz0u30g730wa4vzz0xnyl8f11lrk7315qj7jz1fh47pb6553365533033636350335403653650063306333633300635163503655353653535605335031350330553500033033366333433663663535336655335055335553353530355333033503300333336635353663650660554353355635155305303053556333333366353323553060365553063030663533555365534355335530",
+		stone: "0g0g40sywflr0wb8hdr0zdjj0f13tzldr3333211210112222221212222220012121001110111222222233232233222111122111212333312223222222211010131223331331112222110010112211122233323223332222212232223332233332021211001212211122222332222233232111232112200101332112211122111321122222222233332222221123322122",
+		logSide: "0g0g60fl1ssf0l5j1fj0qftm2n0wa7mdb14cs7wf16az8xr3143304330341432315230523034133230223052313113324032313232301342413230325232314343134131524131432313422343433143230343243342324331053324324242433315332332414303333432303231430331343230533053135133424052303323531343314231333343143340313114334314134131331432",
+		logTop: "0g0g90l5j1fj0qftm2n0wa7mdb0z2esxr15quebj189da7z1cpma671f7ppfj1hzyayn1012101120110111077776768667777017334454555544811738877776777471164766666666756107576445544674601646636666466471165764655656756116576465464674610657646666566460164764434556756116576666666674610757767777787460175454444444447117776676686677711011101120110211",
+		bedrock: "0g0g509gy58f0e7f7r30o8fd330rkrev31627mkf3111124324211212133434341443012110110111412224232433202422111112014111121134433112221221102211014432344323443410222122211011213234421122344344442110121213211143334134410144431102221123442334402111321134111112343420211101234433211211234421121011044312301123",
+		glass: "0g0g50ybfh8f0znkiyo12rzshr1au95hb1lytipr4444444444444443411111111111111341114111111111104114111111111110413111111111111041111111111111124111111111111110411111111111111241111111111111124111111111111112411111111111111241111111111111123111111111111412411111111111411231111111111111133323222222222233",
+		cobblestone: "0g0g60muaccf0r0pekf0un11q711vr5rz1a8mosf1ef1r0f2144011454313543145330554330132314342143342101321132113232134310021354131154443152453321033543234313433211243215332233213541231321542213533311021543232233121341323231101221044532211235411035532354215434213323154331432332113244323212332143111311232121135432",
+		mossyCobble: "0g0gb0muaccf0mupnnj0p38xdr0r0pekf0rbmj9b0un11q70w1wkxr0y07svz11vr5rz1a8mosf1ef1r0f4199211276438a9619a8812764813858398951644251118533852182851464110531183233866642a176895308948428981498852118851988111851664158385117641484642305126244558824124185442111155214698112124761318998127651764653885847488164588511858685851588531841183352111338a984",
+		stoneBricks: "0g0g70p2gyyn0rkrev30tj2nlr0xf9ou70zdjj0f12psrnj17g8flr5666666666665550645455555444445065454444445534406434554345434330632334544334324053244333345324302222222222222220110011000111111166666650566666663555544065455554544544306435354445544320634344454444343053345433332322305443344322222220222222221111110000111111",
+		mossyStoneBricks: "0g0gc0mupnnj0p2gyyn0p38xdr0rbmj9b0rkrev30tj2nlr0w1wkxr0xf9ou70y07svz0zdjj0f12psrnj17g8flrab3668863b88a680b9a28683a9999332ba926363996a2931b9792a679a979721b737793993697591a72397773632297075225752332277924410441110000444886bbba1abbbb6883aaaa991ba9aaaa6a99a9971b97a7a399aa99351b797992a99997371a689a97777573371a897799755223791722757754000041110004400",
+		bricks: "0g0g90vz62nz0yhavi712oqn7j13rinsv173m8lb193f4zj1b1w1rz1d7u7sv1j1u51b7742888777458777443513444435144410060033100503112256522225565222887747458777474214444315133333151341110600133105522225565522225677458887474588774435344444153444110511331106133325565222225652224777474287774745144444353444441501111106011111065222225655222566",
+		coalOre: "0g0g70ehg7wf0hjr9j30j7xaf30sywflr0wb8hdr0zdjj0f13tzldr6556544543445666554536666553335454331453344511556665655105655644455443346545645556553215542143464552111065105555433556663334466661156543215455645565354100056665354514334663354455555666634106655443366412111054665105556005455554456665566544455555554655555566",
+		ironOre: "0g0g80sywflr0wb8hdr0zdjj0f13tzldr1cpl2bj1gbvabj1o4exa71qwyvb33223211210112333221203333220002121005120011265223332322642322311122110013212312223220762217510131227655432542222100223330001133336523210762122312232021644423332021251001330021122222333301643322110033167666421332542223442122221123332233211122222221322222233",
+		goldOre: "0g0g80sywflr0wb8hdr0zdjj0f13tzldr1x01czj1y6gem71z13ncv1z141z33223211210112333221203333220002121005120011265223332322642322311122110013212312223220762217610131227655432542222100223330001133336523210762122312232021644423332021251001330021122222333301643322110033167655421332642223442122221123332233211122222221322222233",
+		diamondOre: "0g0g80h634zj0sagdtr0sywflr0wb8hdr0zdjj0f13tzldr1845xbz1ndl24f5445433432334555443425555442224343221342233461445554544604544533344332235434534445442764437632353447611054104444322445552223355556145432764344534454243600045554243413223552243344444555523605544332255367611043554604445004344443345554455433344444443544444455",
+		redstoneOre: "0g0g90sywflr0wb8hdr0zdjj0f13oi67z13tzldr15wexa71b68mbj1f24cfz1yr4gsf4224211210112444221204444220002121005120011285224442422832422411122110014212412224220862218610141227655342532222100224440001144448524210862122412242021633324442021251001440021122222444401834422110044168655321442832224332122221124442244211122222221422222244",
+		lapisOre: "0g0ga04hvenz04hvl6n04ihywv066fd3306r2ozj08z4sfz0sywflr0wb8hdr0zdjj0f13tzldr9889877876778999886669999886668787454386777813889889926329989977788776679867978889866428862576797861242398238888723679978767799993189872643386678998687222236258686627661237725788300799668893588779906612366339998700381039799887783339899877788888899888888899",
+		emeraldOre: "0g0g7004swsf06mdmv30sywflr0wb8hdr0zdjj0f13tzldr1ohjdhb5445432232334555443445615442334343223310333422445555225555546133344361324555104445441061243255353445551054434444332232552323355555545461442244534444441053615224243433223310361344444556155551044223455103322553261334455444344441045554455433344554443544444455",
+		coalBlock: "0g0g501e50xr03md24f05ul3b308mtq0v0bf3ri73322122002210012222121000210123321000122000022221001243222202210001233222100210020222221000001220132211001122222022210122343221002110123322210000012123221103200212122210002211232102112210012230002113432123322000123420023221000123210012221001222212212221000",
+		ironBlock: "0g0gb1dawbnj1fj5rlr1hrdssf1m7r1mn1nlyvwf1pa4wsf1qe8xdr1s2ey9r1t6iyv31tqkz5r1ver01r32233333333222232aaaaa9998777772277777777777777105555555666444402aaaaaa999777771277777777777777105555566664444402aa9999977777771277777777777777105555555566644402aaaaaa999977771277777777777777105555556666444402aaaa9999777777127777777777777712222222112111111",
+		goldBlock: "0g0g91kr8um71mphb0f1w77ain1xakkqn1ypvwu71yr43jz1yzk7pb1z0cef31z10mwv2222332223333221285577888776688125664877623324812564877462224471374777462264467137777462267762302877444667762330287444664462232037444664466222613744664466662461364667766666742032667762262776203267762332446261334462332666224132322332662264701101100011001100",
+		diamondBlock: "0g0g90434min061d2in0h634zj0l2fpxb0sagdtr0vckf0f1845xbz1ndl24f1z141z33333223332222331378866777664477138445766432235713845766543335561265666543345546126666543346643203766555446643220376555445543323026555445544333412655445544443541245446644444653023446643343664302346643223554341225543223444335123233223443345601101100011001100",
+		redstoneBlock: "0g0g50vx660v153407319j36671gh49a71runlz34444444444444444433433222334333443342202222232344332311001120234443211012011244443210000000042344302100000011134421100000000122442231000000111344324110210111234432110004001224443321101001110344322211111122224443124211022323443334433223333344444444444444444",
+		lapisBlock: "0g0gd05lqqkf06zt0xr07js8hr07tw35r084kzr308e6ein08e99fj08yjpq708ys8ov0an2j270c0w4cf0dp94hr0fdf5kv98999989cb848484878b78736733677197b8867767623765967877377863366597687666378a63759a77776636a7736197a767676236763596763666a6233625c636636376632775c633687363332371963237873676327186672236338763619763722332677630877633332336667143766633633367708111111610220000",
+		emeraldBlock: "0g0g606lfrb306mdmv307ei5fj07xmdbz0iaro5b10c5ptr0000000000000002055555454551144305000000200002430404555411114243050500000002425305050555445212130405054411421203040405451142120305040411020202130404041122120213042105410112420301212222222242030405510000441213012222222222224301011001110014532333333333333332",
+		tntTop: "0g0g704qh5a70nyecxr13jyl8f14a4flr1d4tukf1otd8u71szz8jj5665566556655665622462246224622462136210012300234431403344004433566006655660566562246204121402246211120000231023443341000111403356651000000506656211020001140224621360200120112344331031140344335661560500611665621462146124612462236223622362234433443344334433",
+		tntSides: "0g0ga07ipw5b0fbhzwf14a4flr1d4tukf1gwtvcv1ldqupr1otd8u71pk09vj1szz8jj1z141z38863886388638863663266326632663266326632663266326632663266326632663266326632663295775577755777799711071550711059745055115157177795717717115505479750571550550759444444444444444433223322332233226632663266326632663266326632663266326632663266323332333233323332",
+		tntBottom: "0g0g413jyl8f14a4flr1d4tukf1otd8u72332233223322332300130013001300130013001300130011111111111111111233223322332233230013001300130013001300130013001111111111111111123322332233223323001300130013001300130013001300111111111111111112332233223322332300130013001300130013001300130011111111111111111",
+		acaciaLogSide: "0g0g60ma181r0oi99fj0pcavi70t8nim70y9464f139ktmn3143304330341432315230523034133230223052313113324032313232301342413230325232314343134131524131432313422343433143230343243342324331053324324242433315332332414303333432303231430331343230533053135133424052303323531343314231333343143340313114334314134131331432",
+		acaciaLogTop: "0g0gb0j7rlz30kvxmgv0ma2nen0o889hb0t8nim713rcxdr16jehof18hk3r31c3oo3j1fprugv1hy2osf432332211231433449999898a889999329556676777766a2395aa999989996910869888888889782197986677668968318688588886886932879868778789784487986876868968448798688887886833869866567789782287988888888968219799899999a96811976766666666691099988988a8899933412233444322114",
+		acaciaPlanks: "0g0g711t8qgv13rcxdr16jehof18hk3r31c3oo3j1fprugv1hy2osf5456666656666652554423455544553345554543333445522112210011010010563666636665443545543432344555543345444255544333001121000011121056654466656666535455554333434332654433334444335300122100012110006556655366646566445533433555544443345432554333330110012221010000",
+		birchLogSide: "0g0g80f1fcov0qqliwv1gxap6n1o60u7z1ptrf271uar6db1uum5mn1z141z36643366634663366346666777634443677744367666636777732100136777737366321101377631211336344363331001266344677766532343777777334556376336775577775777764455577766336336777766634477636777767777577634436633667553210026677763443100000133377761132116331677764336336",
+		birchLogTop: "0g0ga0mk6h3316m5am719xxgqn1cg9ce71f8hx4v1jowirj1nv4jcv1nvimm71tgjy7z1z141z39818811001809889966665657556666816223343444433718627766665666360153655555555645106465334433563580535525555355368154653544545645995465354353563599546535555455358853653323445645115465555555563510646656666676350064343333333336016665565575566688901188999811009",
+		birchPlanks: "0g0g717znmrj19xxgqn1cg9ce71f8hx4v1jowirj1nv4jcv1nvimm75456666656666652554423455544553345554543333445522112210011010010563666636665443545543432344555543345444255544333001121000011121056654466666666535455554333434332654433334444335300122100012110006356655366636566445533433554544443345432554333330110012221010000",
+		darkOakLogSide: "0g0g60besef30dcwlbz0e6y70f0hj7ev30klcs8v0oho0e73143304330341432315230523034133230223052313113324032313232301342413230325232314343134131524131432313422343433143230343243342324331053324324242433315332332414303333432303231430331343230533053135133424052303323531343314231333343143340313114334314134131331432",
+		darkOakLogTop: "0g0gb08ml79b0auqebj0dcmqdb0e6y70f0f117gf0g4r4730h8wirj0hj7ev30kb0idb0lz2akf0n393wf741441100140744779999898a889999419225565666655a1492aa999989995903859888888889681096985566558958408588288885885941869858668689687786985865858958778698588886885844859855256689681186988888888958109699899999a95800965655555555590399988988a8899944701144777411007",
+		darkOakPlanks: "0g0g70bejy0v0dcmqdb0g4r4730h8wirj0kb0idb0lz2akf0n393wf5456666656666652554423455544553345554543333445522112210011010010563666636665443545543432344555543345444255544333001121000011121056654466666666535455554333434332654433334444335300122100012110006356655366636566445533433554544443345432554333330110012221010000",
+		jungleLogSide: "0g0g90h96cxr0htdywv0m9k4xr0ne277j0orqc5b0rkbldr0sxvim70wunksf0ys83cv4688422222666444444114414441001111137510011441866644668842422224146644411143573444422235311010006646442222444886101000466412222444688411068844441122575311222100755444666664355741100112241201661144866643341111623533422111444644111004661664444664122244442222",
+		jungleLogTop: "0g0g90h96cxr0htdywv0rkbldr0ys83cv160fym7188mku71batekf1f77h1b1h5ei2n3212210011213223377776768667777217444454555544812748877776777470164766666666756107576445544674620646646666466472165764655656756336576465464674633657646666566462264764444556756106576666666674600757767777787460175454444444447117776676686677722310122333211013",
+		junglePlanks: "0g0g70sxkd1b0xdxkov160fym7188mku71batekf1f77h1b1h5ei2n5456666656666652554423455544553345554543333445522112210011010010563666636665443545543432344555543345444255544333001121000011121056654466666666535455554333434332654433334444335300122100012110006356655366636566445533433554544443345432554333330110012221010000",
+		spruceLogSide: "0g0g60csc9vj0cskpof0dmmb5r0geuxof0lf4i670nnb4sf3243304330342431325130513034233130113051323223314031323131302341423130315131324343234232514232431323411343433243130343143341314332053314314141433325331331424303333431303132430332343130533053235233414051303313532343324132333343243340323224334324234232332431",
+		spruceLogTop: "0g0g80ix87pb0nnb4sf0p1n6db0qzu7zz0v5xypr0xy569r106bshr11ueyv31012101120110111066665657556666016223343444433711627766665666361153655555555645106465334433563501535525555355361154653533545645115465353353563510546535555455350153653323445645115465555555563510646656666676350164343333333336116665565575566611011101120110211",
+		sprucePlanks: "0g0g80nnb4sf0p1n6db0qzu7zz0v5xypr0xe36rj0xy569r106bshr11ueyv36567777767777762665523566655663356665643333556622112210011010010673777737776553656653532355666653356555266655333001121000011121067765577777777636566665333535332765533335555336300122100012110007367766377737677556633533665655553356532665333330110012221010000",
+		sand: "0g0g61m6x62n1nb9nnj1opn5dr1r80f7j1scbi0v1u0izgf4223213232132313122121130142502432011422222121122331213133132122125213232322122321223332123122121421151211022121212212212111242112322310131232124212221120212231202321232232012311223212331112121213132145321123323230232323221223235332323203223232332321223232",
+		gravel: "0g0g80rufq4f0vqwlbz0zxiprz125i9rz15rvcan1627mkf1d0twqn1dackxr0341152512122521522122312102333522103133522351352232321522512322132741122210253202140133526552213104226515530122553253522311225353521223310256122311652152322132123553102521325022533562113225212132222537415525331025232422215235323311243310351274122232321212",
+		blackConcrete: "0g0g40149on3028826702882yn028dp8f1330112022012232303130022112212111032203010022012122012222321221011223213030101033110011212233120230013131003200032022012002002112233122202312230200102211312102222122132011021201223320211021220121122122321331201102120210001220112022023302312210123220102110",
+		blackWool: "0g0gf0149on3028826702882yn028dp8f03cc2rj03cc3jz03chptr04gg3cv04glqf305kk3y705kpr0f06oo4jj07ss54v08ww5q70a106bj46348b45ab13993299eebb7742570367bc77dc97bcbbdeb996bc768c47cc96ec9749bb115953bb31314c414641672547eebb8879bea7eeb966eebacc45bca9ccbb35ca4657528733577b117949ee7beeccbbecbacb799839349966bb445911796611cd318b9bee92badecb9717bc77cedc97c99beb559b6424c946cd76ac44bc",
+		blueConcrete: "0g0g30c98pof0c98qgv0c9ecqn1000001101000201011001000101120101211111010200000001000110100100220110011001121111001100100100010200102101101000000011110001101010101011020111110000000101121111101100100100010110111010210111001101000100000111110100101111000120000010100000110001200110010002",
+		blueWool: "0g0gj0c98pof0c98qgv0c9ecqn0c9edj30ddcr270ddidbz0ddie4f0ehgrnj0ehgsfz0ehmepr0ehmfi70flkt1b0flqfb30flqg3j0flw2db0flw35r0gpugov0gq02yn0gqbd3335237c44ac12992289iidc6632460256de67ge96cebbhic985ce657e46ee85ie9648cc114942cc21214e413541562436iidc7769dia6iic955iicaee34cea9eecb24ea4546427622466d116949ii7biieecciecaed699728249955cb344911695511eg217c9bii92bahiec9617be67eigf86e99cid449b5324e935eh65ae34de",
+		brownConcrete: "0g0g30pl5gqn0qp3u9r0qp9hbz0211211202222221222122211211122121011102222222212211200222112101121111211111222121222122122221201212121222112122222221220222222122221201121212022122122110221211122221211011221212121010121011111212122221121221222212122112112112211010222111121211220222221122",
+		brownWool: "0g0gi0qp3u9r0qp9hbz0rt7uv30rtdh4v0sxbunz0sxbvgf0u1a8zj0u1fv9b0v5e8sf0v5e9kv0v5jvun0w9i9dr0xdgmwv0xdm9z30yhkni70yhq9rz0zloo3j0zluadb35228d45bd12aa219bhhed7721570257ef77gfa7dfccghdb95df758f47ff95hfb749dd115a52dd21214f413541571526hhed887aehb7hhda55hhdbff25dfbbffdc25fb4557518722576e117b4bhh7chhffddhfdbfe7ab82924bb55dc245b116b5511fg218dachhb1cbghfda717cf77fhgg97fabdhe55ac5214fa25fg75bf24ef",
+		cyanConcrete: "0g0g305objsv05obklb05oh6v31112010122111202100121222111122012212211101111202102221210222122211111211221111011021102021212212220211021022022201210110010212210211110202101010201110112020221222112102111202212110222110211221001010211001221212202222122111221102211100222112011211120220211",
+		cyanWool: "0g0ge05obklb05oh6v305omt4v05omtxb05osg7305oy2gv05p3pj305p9bsv05p9clb05peyv305pkl4v05pklxb05pq87305pq8zj242269347912662167dda95521450145ab55cb659b88cd97649b546b35bb64db7536991146419921113b312431451424dda96656ad75dd9644dd97bb249b77bb9814b73445416521454a115737dd58ddbb99db97ba56762623774498234711474411bc116968dd7187cdb965158b55bdcc65b679da44684213b624bc547b23ab",
+		grayConcrete: "0g0g20ehlvr30flk9a70000000000000000000000000000000000000000000000000000000000000000000000000000100100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000100000000000000000001000000010000",
+		grayWool: "0g0gd0ehlvr30flk9a70flpvjz0flpwcf0flvim70gptwxr0gpzjzz0htxxj30hu3jsv0hu3klb0iy1y4f0iy7ke70iy7l6n333359337803663157cca85531350135ab55cb658b88cc87539b545b35bb53ca7535990036329930103b303330350335cc995556ac75cc8633cc87ba339b77ba8813a73435305532355a005737cc58ccab88cb87ba56753533773498333700574300ac205968cc7087cca865058b55bccc55b679ca33684313a634bc537a33ab",
+		greenConcrete: "0g0g20k2mku70k2s73z0001000100111100101010100101101101101100111010010111001001011000100001100011000100101010110101111010000001011001001000100001010110101110010011010000101011110000010110101000000001010000110101011101000111110011101010011000111100001100011000000111101001101100",
+		greenWool: "0g0gh0k2mku70k2s6bj0k2s73z0l6qjun0l6w64f0l71rlr0mb054v0mb5qm70mb5ren0nf9qf30nffcov0ojdq7z0ojjbpb0ojoxz30pnnbi70pnsxrz0rw0y6746447c45ab1499419aggcb8841580168ce88ee98bebbfgba96ce867e48ee96gda849cc125953cc41114e424642681546ggcc7789cga8ggb966ggbaed45ceaaedbb15da4658517843586c21894agg8bggdebbgebaec89a749449966cb445a116a6621de327c9bgga1bafgdb9828be88egee98e9acgc559b6414d946ef86ad44ce",
+		lightBlueConcrete: "0g0g3090ti4f090z4e70a4xipr2120111111121222222121122112211121121211112221221111102221122212112021111111122111112111112121211222221111122121212121112021122112211121211211111121220111212121111121222001122211222221022122111011221111111021211221211211121112212111111122121111211112222111",
+		lightBlueWool: "0g0gq090z4e70a4xipr0a534zj0a58r9b0b974sf0b9crun0b9ie4f0cdgrnj0cdmepr0cds0zj0dhqein0dhw0sf0dhw1kv0em01dr0em5nnj0fq9o8v0fqfain0gudou70gujb3z0hyhon30hynawv0hynbpb0j2lp8f0j2rbi70k6pptr0latpmn7b57fm89ik26ff63fippnkdd739d04benodepogdkojjppkifblodcfo8doofbpoie8fml21af95mm62428o817b81bd397cppmlffefnpidppkgbbppkioo79loiiookj4aoi8cad93fd55adcn22dh8ippejppookkpokiondfif6f68hhbcmj78ai22cicb22op51fmfjppi3jippokfd2ejoeeoppofdofilpn9agjc738og7copebio78no",
+		lightGrayConcrete: "0g0g20yjgg730yjggzj1000110001001010100010000000011101100010001001011010001100101010001000000000000010100000000100010100000000001010100010001000000000100000110000100001100000011101110001001011001001001001011000000000011001001001001010000000010000000010100110000000001000001001",
+		lightGrayWool: "0g0gi0yjgg730yjggzj0znkgsf0znkhkv10rohdr10roi6711vshz311vsirj11vy5tr12zwjcv12zwk5b1440jy7144670f1584kjj1584lbz16c8l4v16c8lxb17gclq745339e55bd1399329bhhfd7732570257ff78hfa7dfcchhdb95df769f57ff95hfb759ed115953ee31215f514551572537hhed9979fhb7hhda55hhdbff35dfbbgfdc25fb5657529733577f117b5bhh8chhfgddhfdbgf79b93935bb56ec355b117b6511fh319e9chhb2cbhhfd9718cf78fhhg97f9bdhf55ac6325fa36fh75bf35ff",
+		limeConcrete: "0g0g30ppd5a70ppirjz0qth5331121111111100111111111110111110111010211100110111211111211101111112111111111111101110111011110211011011110111110102111110100111000110112112110211112112112111212111111111111111011111011100101111111111212111111111112010011011221111111110111120011110111101111",
+		limeWool: "0g0gg0ppirjz0qth5330qtmrcv0rxl4vz0rxqr5r0t1p4ov0t1uqyn0u5t4hr0u5yqrj0v9x4an0va2qkf0we143j0xi53wf0ym3hfj0ym94hr10uh5of35237c44bb1299228affcb6632460257cd67ed96bdbbefba85bd657d46dd85fca748cb104942cc21214d403540562435ffcb7779cfb6ffb955ffbbdc34bdbaecbb24cb4546427622465c01694aff7bffcebbfdbbec69a728249955cb344a105a5501ce207c9bffa2bbefcb9607bd77dfee86d9abfc449b5324c935de75bc34cd",
+		magentaConcrete: "0g0g419jw2rj1anugan1ao02kf1ao03cv2233313332221332333333233213322333223332331233333313323103121223222131233211303233130230322231223302323103002220333103232232223333313231221331233333231232212303302330122232333333332123320111033031332321233232303322232223332223231233212323332233222231230323",
+		magentaWool: "0g0gs1ao02kf1ao03cv1brygvz1bs435r1bs43y71cw2hhb1cw83r31cw84jj1e06i2n1e0c4cf1e0c54v1f4ainz1f4g4xr1f4g5q71g8ej9b1g8k5j31g8k6bj1hcijun1hco64f1hco6wv1igmkfz1igs6pr1igs7i71jkw7b31jkw83j1kp08ov1lt49a71mxdwxr6945dl77ij14ff43ehrrmjba537a039cmoacqogajojjqrjhe9koa9do7booe9rnhc7elk118f74ll41317o7169719a275arrmkddcfmribrrjg99rrjion57koihonjj38ni798a72db448bam11bh7hrrcjrrnojjrojiomafhd4e47hh99lj578h11ah9911nq41dlfjrrh2jiqrnjfa1cjoccorqpebofhkrm78gj9537ng59oqc9in57mo",
+		orangeConcrete: "0g0g21p59iwv1q97wfz1011110111101111111011111110000111101110100111111110011111011001001101110110111111111110111111011111101110111111110111111111111111011110111101111011101101101111010010111111110110101110010011101111111010101001101111111011111110111111111001111111101111111111",
+		orangeWool: "0g0gm1q97wfz1rdbw8v1rdbx1b1rdhjb31shfwu71shfxmn1tljxfj1tljy7z1tlpkhr1upnytb1uptl331uptlvj1vtrzen1vtxlof1vtxmgv1wy1m9r1wy1n271wy79bz1wycwe71wyijgf1wyo5q71wytssf46239f55de02aa219dllhe8731570268hi79kib7eieelled96fi779i58ii96lhd859ff005a52ff20205i504650671537llgf998ahld8lleb66lledih35fiddihee25hd5757519822587h008c5dll9ellhieeliedih7ad92925cc67fe355d007d7600hk209faelld1edllhea709ei89ilkj98iadflh55be7315hb37il86dh35hi",
+		pinkConcrete: "0g0g31ltks8v1mxj5rz1mxj6kf1122212121112211111211211211122112111221111111121211212111122211111112112121112111111111111112111212221121111111212211112101110212211211122111211112212111211110211211211211111111121212221211121111112212211121211111211212211111111111121112111211212122122111",
+		pinkWool: "0g0gv1mxj6kf1o1hk3j1o1n6db1p5r6yn1q9v6rj1q9v7jz1rdz7cv1re4uf31si37y71si8u7z1tm78jj1tmcutb1tmcvlr1uqgven1uqmigv1uqs4qn1vuqj271vuw5bz1vuw64f1vv1se71vv7fgf1vvd1q71vvd2in1vviosf1vvipkv1vvobun1vvocn31vvtywv1vvzlz31vw588v1vw591b6a46em78jk25gg53fjuuokdc638c03adoqcesqhckqkktukjfalqcbeq7dqqfaupjd7fml219g83mm52327q716a71ac386buunleedgoujduukhaauukjqp68lqjjrpkk39pj7b9c83ed439dbo12di7juuekuuprkkuqkjrocgje5f57iiabmk679j22bjba12ps31emgkuuj3kjtupkgc1ekqdequssfdqgjluo89hkb637ph6bqtdajp67oq",
+		purpleConcrete: "0g0g40qo16v30rrzke70rrzl6n0rs57gf3222322033323333333312320220233231302222232332333202332233033330333322320012333323333330233022223332223332223232323303323233332332021220323110033223333322032332312323332322322202232223033232221223233023333332022233332332233232023333233223032323332323323332",
+		purpleWool: "0g0gm0rrzl6n0rs57gf0sw3kzj0sw3lrz0u01zb30u07lkv0u07mdb0v45zwf0w84dfj0w84e7z0xc8e0v0xc8etb0yg6scf0ygcem70zkasxr10o96gv10o979b10oetj311sd72711sd7un12wh8fz154uxhb47349e45ce13aa32acllfe8742570279fh79jhb7ehddkleca7eh779h48hha7lgc94aee116a52ee31214h414741771547llfe999aflc8lleb77llechg45ehcchged26gc4767519832687f118c4cll9dllgheelhechf7ac93a34cc77ed446c117c7711gj219eadllc1dcklgea719dh99hljia8hacelf56bd7424gb47hk97cg44fh",
+		redConcrete: "0g0g112voa9r0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+		redWool: "0g0gd12voa9r13zmnsv153l1bz167jev3167p14v17bnenz18fls7319jprzz1ano5j31ano6bj1brmjun1brs64f1f3yku7241258227712662157cc9754212401459b45bb647b77bc77548b445b25bb54ca7525881036218821112b202420441224cc8855569c75cc7644cc77ba228b77ba7713a724342155113549015627cc57ccab77cb77b946752522664487223711474401ab105867cc7177bca764057b55bcbb55b678c923674212a624bb547a229b",
+		whiteConcrete: "0g0g31ktui9r1ku04jj1lxyi2n1121212211221121111221111121122111211111121112111212112211111211212222111111221112211112101110211111122211211211111111212221111112212121212222111121122211111111222111111112121222121111111111211121221112221111121222121112212122111221211212111121221211221212",
+		whiteWool: "0g0gn1lxyi2n1lxyiv31ly454v1n22inz1n22jgf1n285q71o66j9b1o66k1r1o6c6bj1paajun1qeekfz1ricyrj1riil1b1smgykf1smmlmn1tqkz5r1tqqm7z1uuozr31uuumtb1vyt0cf1vyynen1x2x0xr1y711j37a56dj89hi26ee63egmmliba639a04acllacmlfailiimmigeajlaadl8blleamlgc8ejj219e94jj62429l817a81aa396ammkjddcelmhbmmifaammihll69jlhgllii49lh8a9a93db549bal12bg8gmmcimmlliimlihllaegd6e68ggaaji689g22agaa12lm41djeimmg3ihmmliea1cilcclmmmeblegjml99fia638lf6almcahl68ll",
+		yellowConcrete: "0g0g41to1w5b1us09of1us5vy71us5wqn2111111122222221232021021213122222211020112110121211022201012212122222312211221122213110202011133121132211112221221211211111112120231210211111201132001211212111211102220222021102211223011100222121202222222132111211111112111112021121120222221222011012122121",
+		yellowWool: "0g0gj1us5vy71usbj0f1vw9wjj1vwfitb1vwfjlr1vwl5vj1vwl6nz1vwqsxr1x0p6gv1x0utj31x10fsv1x10glb1x163nj1y54h6n1y5a48v1y5a51b1y5frb31y5fs3j1y5lf5r45239e44bc0299219biiec7731470158eg78hga7cgcchicb95dg759g47gg95ifb849ed005942ee20104g404540571436iied9989eib7iica55iicbgf34dgbbgfcc15fb4557419722576e007b4bii8ciifgccigcbge79b92924bb55ec345b006b5500fh209e9ciib1cbhifc9708cg88gihh97g9bdie45ac5314fa35gh85bf34eg",
+		bookshelf: "0g0gt03fxnnj04laqdb0a0ot1b0b6j6db0c8r6db0deww730df88ov0egz6rj0gpo9330ht5kov0k20av30nf40zj0pnc1dr0qoh8fz0sy416n0w8kcn30wc5n9b0yicu0v11vb08v11vskcf13z03jz16atkvz17fehvj1as1ce71czhmv31e50qv31g6nvgf1gbtpfj1ks44qnommllhlllmmmmlmoo44477444772534oo799kk999ni9637olkffqk99gpjk631lsqffqk64gnik631soqfdqf6gcngf651ookd9kf3c7igf350mlorrsssroorrroolollmmhmllmmmllhoo77227cb7427724ooqk763gck99cb97olpj063gckq4gc10hsqk063a8fqkgcpjsoqf065a87kqgc10omkfe35ccefkcb03oorrsssroorrrrooo",
+		netherBricks: "0g0g706o77cv08w9lhb0b4bzlr0dcedq70fkb4sf0gof6670iwn6kf0000000000000000556515666555165532340433333405333432133223321333000111000001110015666544155545540543333306433333143333221433243211000001110000014416641644164414330433063304330423143314321333140111011101110111464414666644166433330433344303333322033333330333",
+		redNetherBricks: "0g0g70c7i51b0efew3j0fjiwov0ive1a70nbiubj0svgd1b0v3ir5r0000000000000000556515666555165532340433333405333432133223321333000111000001110015666544155545540543333306433333143333221433243211000001110000014416641644164414330433063304330423143314321333140111011101110111464414666644166433330433344303333322033333330333",
+		netherQuartzOre: "0g0gc0hs27zz0m7vq4f0m81d6n0ncb0u70rsft330u2845b0v4m7sv10p0npb1bug2671e4e1vj1n1fv9b1smb9xb1312426644044643344320246610442164643068a921424676466baa866314246766ba8674662643166895678a8544641466565ba95146866310289856642b9742469b814466ab862467ba624646b952364a950268665602426852108b61623214642649a9164941364667689238976124667423804646442246624630246644",
+		netherrack: "0g0g70hs27zz0m7vq4f0m81d6n0ncb0u70rsft330v4m7sv10p0npb1312425544044543344320245210442154543012432142456545423545531424565424566455254315431566554244541452054554214565531024541154246642454221445541452456540245455112354554025655200242254210254102321454254122154541354556512234565124556423204545442245524530245544",
+		netherWartBlock: "0g0g60of09vj0suze9r0xana4f1539r7j1brbain1g7rcvz0122001222532010222235202110022112111222202202320122201003202242042220021211122103224300222201201022220122252002210210211223102220000221222200222022221132210202012201104100222102201012211021042230122022012022212012022002220222202202220234022205220322022302",
+		quartzBlockBottom: "0g0g31sm5mv31tq9ngf1tqfbb32222221111000222121111000002222111100000012222110000001122221110001111000110000011100000110000011111222200001111222222211111111222211000112222220110012222222211222222222210000022222211000000222222110110112222111100112222221100101122222111101222222222210000",
+		quartzBlockSide: "0g0g61p9z6kf1qe37y71sm5mv31tq9ngf1tqfbb31uujcov5555555555555555543333222224444153322222234444304222223344433330423333222332222153322222332222215333444422223330544444433333333054433222334444405332234444444430544444444432222154444433222222405444332332334440533322334444443042323344444333311100011111110000",
+		quartzBlockTop: "0g0g61p9z6kf1qe37y71sm5mv31tq9ngf1tqfbb31uujcov5555555555555555543333222224444153322222234444304222223344433330423333222332222153322222332222215333444422223330544444433333333054433222334444405332234444444430544444444432222154444433222222405444332332334440533322334444443042323344444333311100011111110000",
+		quartzPillar: "0g0g41qe37y71sm5mv31tqfbb31uujcov0202031312130212020302130313031202131313120313020313130213031313131303120302121313020312031203131302131313020303120313031303130312130303131303120213131302131212131312130202120313021213120302031302120313031303130202130303131303120313031213120212131302121202",
+		quartzPillarTop: "0g0g51p9z6kf1qe37y71sm5mv31tqfbb31uujcov1021223242413020222122211221122002223434434322223123443344443211113412222221431242442344443244222243242222424423423324244142441222442424324234143244242211423322224423334432442421341222222143111123444444443213222234444443222002211222122112221203142423220200",
+		chiseledQuartzBlock: "0g0g61p9z6kf1qe37y71sm5mv31tq9ngf1tqfbb31uujcov0444404333022440043331222204444003322111000444300222223004443331023011101110022103315544432202200110441100220000554444144033344544433204314444440111230011441101054044444432154104400110111004401444454005544440133321100004443002323155440333300444414444132220",
+		chiseledQuartzBlockTop: "0g0g51p9z6kf1qe37y71tq9ngf1tqfbb31uujcov0334314232133420021100022000112002044203204421200204120420412021020113032020003102233304212233200000000421110000323433442223344422222222222222220000001321000001044343142143222104011204214110201302130420313020120234032023403002111003201100400222314222133420",
+		chiseledStoneBricks: "0g0g70oigd8f0qqoef30sz21vj0xf6vpb0yjgikf11vskcf17g711b6666655666566562644424444224444054110000111123205206665566561530640654434442154064064322334315405205430005421630540632000643062052054300053206306215435655420630641644545432053064163232322215406421110000011530556655666655543053343234433232202000000000000000",
+		smoothStone: "0g0g70wb8hdr0yjgikf12zwkxr17gcnb318kgnwf1asop331d0wq9r1011002200220121054556666553445204334454444555501666455566655442255444545666645006555555554343412556664665545550243343443434466116656545555455620555554566656661054544334454454215555666665566622444566454433452165445556555455104456665566544401022112221000121",
+		soulSand: "0g0g60egz94v0ht5n270k181z30oho3jz0sxyiv30xeekfz3130033202100434433135531100234004241451321012411423432542212230032442154212211332234104322433212002314322315332220023322345513032322211233445304302332013540423202342330242132302341043213032020354044321232020431445421112202350345131123302354202432103212415",
+		glowstone: "0g0g80u1fugv0v5phbz10pn01r11uj6db1kqv1tr1x1ncov1y6jzlr1y711j35420045440276423654011240346654024032201131054033034542017510033014766405664136502566552454236751004554020132450531024010352320465230213276501576442654346640335420454220452013000320356304012311354016754036520357660354215764034654201003242013154216521100013",
+		andesite: "0g0g60sywflr0wb8hdr0yjgikf11vsl4v17gcnb31asolxb2114332104423221245323445330122411334410122443224410133445433231235442223333211433323243210013432324542104543333423310154332333433114143343224533143342221154333332321101544332201331254422332333443443233212331543333334533112233301244323223541321322323234432",
+		diorite: "0g0g60xfchz311vskcf19of1fj1gd8su71ktouf31smgykf1222352233524355201322135345543151355101325543235255312553213225351243153532255245355541332335235332455214554102243123234555521232203255443244250155213551234541244310134335513055510144221512352542543554223223212343125454353242115521455321245235554124421255",
+		granite: "0g0ga0l56fi70plgu0v0yhw0sf1424tmn17eb8cf1aqna4f1e3al8f1e3x7un1jnje2n1qczoxr7434244344046445431548244224422341444335249241464143446145532344234232113754334244255342143347242445524442555322424474302155243346344255522344245535242552464245557314243844212555415442024425030323244424324439435524312355344448553215435547245544733324244425",
+		polishedAndesite: "0g0g90oilzi70sz23gf0v7a3270yjgjcv10ru60v11vyakf11w3ugv19okmwv1e4v30f7878888888788785843334442443134084444443376644307416763343446440844442456433334083344333424433318444634666554320833433332123444184562444466776608434433443344540844667633366444081444444664466208466654333134760844433334465334083333664444334406100000000110000",
+		polishedDiorite: "0g0g80qqu0ov0xfi5tr11vy6m71asubcv1f94t1b1jpkttr1o60w731ri7bpb7776677777666774764556657643564166764466577434506565333565454441675334576435457176544567733456607566767655346450744765756564534063556655467534516566544565544761664334655465666075673555775644517557654375466340745654576435744072445566545654512101110001100110",
+		polishedGranite: "0g0g90l56fi70plgu0v0yhw0sf1424tmn17eb8cf1aqna4f1e3al8f1e3x7un1jnje2n8888786866866565843344345444334374744554442446418444243334553342844444453344443262343344443734428345543644444431844444423445544263422344554433636444433443344442734444444464334284473344244442318455444445543341633443264434455264443444334447412111001110111100",
+	};
+	let blockData = [{
+			name: "air",
+			id: 0,
+			textures: [],
+			transparent: true,
+			shadow: false,
+		}, {
+			name: "grass",
+			textures: ["dirt", "grassTop", "grassSide"],
+		}, {
+			name: "dirt"
+		}, {
+			name: "stone"
+		}, {
+			name: "bedrock"
+		}, {
+			name: "sand"
+		}, {
+			name: "gravel"
+		}, {
+			name: "leaves",
+			transparent: true,
+		}, {
+			name: "glass",
+			transparent: true,
+			shadow: false,
+		}, {
+			name: "cobblestone"
+		}, {
+			name: "mossyCobble"
+		}, {
+			name: "stoneBricks"
+		}, {
+			name: "mossyStoneBricks"
+		}, {
+			name: "bricks"
+		}, {
+			name: "coalOre"
+		}, {
+			name: "ironOre"
+		}, {
+			name: "goldOre"
+		}, {
+			name: "diamondOre"
+		}, {
+			name: "redstoneOre"
+		}, {
+			name: "lapisOre"
+		}, {
+			name: "emeraldOre"
+		}, {
+			name: "coalBlock"
+		}, {
+			name: "ironBlock"
+		}, {
+			name: "goldBlock"
+		}, {
+			name: "diamondBlock"
+		}, {
+			name: "redstoneBlock"
+		}, {
+			name: "lapisBlock"
+		}, {
+			name: "emeraldBlock"
+		},
+		// { // I swear, if y'all don't stop asking about TNT every 5 minutes!
+		// 	 name: "tnt",
+		// 	 textures: ["tntBottom", "tntTop", "tntSides"]
+		// },
+		{
+			name: "oakPlanks"
+		}, {
+			name: "oakLog",
+			textures: ["logTop", "logSide"],
+		}, {
+			name: "acaciaPlanks"
+		}, {
+			name: "acaciaLog",
+			textures: ["acaciaLogTop", "acaciaLogSide"],
+		}, {
+			name: "birchPlanks"
+		}, {
+			name: "birchLog",
+			textures: ["birchLogTop", "birchLogSide"],
+		}, {
+			name: "darkOakPlanks"
+		}, {
+			name: "darkOakLog",
+			textures: ["darkOakLogTop", "darkOakLogSide"],
+		}, {
+			name: "junglePlanks"
+		}, {
+			name: "jungleLog",
+			textures: ["jungleLogTop", "jungleLogSide"],
+		}, {
+			name: "sprucePlanks"
+		}, {
+			name: "spruceLog",
+			textures: ["spruceLogTop", "spruceLogSide"],
+		}, {
+			name: "whiteWool"
+		}, {
+			name: "orangeWool"
+		}, {
+			name: "magentaWool"
+		}, {
+			name: "lightBlueWool"
+		}, {
+			name: "yellowWool"
+		}, {
+			name: "limeWool"
+		}, {
+			name: "pinkWool"
+		}, {
+			name: "grayWool"
+		}, {
+			name: "lightGrayWool"
+		}, {
+			name: "cyanWool"
+		}, {
+			name: "purpleWool"
+		}, {
+			name: "blueWool"
+		}, {
+			name: "brownWool"
+		}, {
+			name: "greenWool"
+		}, {
+			name: "redWool"
+		}, {
+			name: "blackWool"
+		}, {
+			name: "whiteConcrete"
+		}, {
+			name: "orangeConcrete"
+		}, {
+			name: "magentaConcrete"
+		}, {
+			name: "lightBlueConcrete"
+		}, {
+			name: "yellowConcrete"
+		}, {
+			name: "limeConcrete"
+		}, {
+			name: "pinkConcrete"
+		}, {
+			name: "grayConcrete"
+		}, {
+			name: "lightGrayConcrete"
+		}, {
+			name: "cyanConcrete"
+		}, {
+			name: "purpleConcrete"
+		}, {
+			name: "blueConcrete"
+		}, {
+			name: "brownConcrete"
+		}, {
+			name: "greenConcrete"
+		}, {
+			name: "redConcrete"
+		}, {
+			name: "blackConcrete"
+		}, {
+			name: "bookshelf",
+			textures: ["oakPlanks", "bookshelf"]
+		}, {
+			name: "netherrack"
+		}, {
+			name: "soulSand"
+		}, {
+			name: "glowstone"
+		}, {
+			name: "netherWartBlock"
+		}, {
+			name: "netherBricks"
+		}, {
+			name: "redNetherBricks"
+		}, {
+			name: "netherQuartzOre"
+		}, {
+			name: "quartzBlock",
+			textures: ["quartzBlockBottom", "quartzBlockTop", "quartzBlockSide"]
+		}, {
+			name: "quartzPillar",
+			textures: ["quartzPillarTop", "quartzPillar"]
+		}, {
+			name: "chiseledQuartzBlock",
+			textures: ["chiseledQuartzBlock", "chiseledQuartzBlockTop"]
+		}, {
+			name: "chiseledStoneBricks"
+		}, {
+			name: "smoothStone"
+		}, {
+			name: "andesite"
+		}, {
+			name: "polishedAndesite"
+		}, {
+			name: "diorite"
+		}, {
+			name: "polishedDiorite"
+		}, {
+			name: "granite"
+		}, {
+			name: "polishedGranite"
+		},
+	];
+	//Set defaults on blockData
+	(function() {
+		for (let i = 1; i < blockData.length; i++) {
+			let data = blockData[i];
+			data.id = i;
+			if (!data.textures) {
+				data.textures = [data.name, data.name, data.name, data.name, data.name, data.name];
+			} else if (typeof data.textures === "string") {
+				let texture = data.textures;
+				data.textures = [texture, texture, texture, texture, texture, texture];
+			} else if (data.textures.length === 3) {
+				data.textures[3] = data.textures[2];
+				data.textures[4] = data.textures[2];
+				data.textures[5] = data.textures[2];
+			} else if (data.textures.length === 2) {
+				// Top and bottom are the first texture, sides are the second.
+				data.textures[2] = data.textures[1];
+				data.textures[3] = data.textures[2];
+				data.textures[4] = data.textures[2];
+				data.textures[5] = data.textures[2];
+				data.textures[1] = data.textures[0];
+			}
+			data.transparent = data.transparent || false;
+			data.shadow = data.shadow !== undefined ? data.shadow : true;
+		}
+	})();
+	let win = window.parent;
+	let doc = document;
+	let console = win.console;
+	let world;
+	let newFloat32Array = function(arr) {
+		return new Float32Array(arr);
+	};
+	let newInt32Array = function(arr) {
+		return new Int32Array(arr);
+	};
+	let newUint32Array = function(arr) {
+		return new Uint32Array(arr);
+	};
+	let newUint8Array = function(arr) {
+		return new Uint8Array(arr);
+	};
+	let seedHash;
+	let hash = (function() {
+		let seed = Math.random() * 2100000000 | 0;
+		let PRIME32_2 = 1883677709;
+		let PRIME32_3 = 2034071983;
+		let PRIME32_4 = 668265263;
+		let PRIME32_5 = 374761393;
+		seedHash = function(s) {
+			seed = s | 0;
+		};
+		return function(x, y) {
+			let h32 = 0;
+			h32 = seed + PRIME32_5 | 0;
+			h32 += 8;
+			h32 += Math.imul(x, PRIME32_3);
+			h32 = Math.imul(h32 << 17 | h32 >> 32 - 17, PRIME32_4);
+			h32 += Math.imul(y, PRIME32_3);
+			h32 = Math.imul(h32 << 17 | h32 >> 32 - 17, PRIME32_4);
+			h32 ^= h32 >> 15;
+			h32 *= PRIME32_2;
+			h32 ^= h32 >> 13;
+			h32 *= PRIME32_3;
+			h32 ^= h32 >> 16;
+			return h32 / 2147483647;
+		};
+	})();
+	let worldSeed;
+    
+	let PVector = function(x, y, z) {
+		this.x = x;
+		this.y = y;
+		this.z = z;
+		this.set = function(x, y, z) {
+			if (y === undefined) {
+				this.x = x.x;
+				this.y = x.y;
+				this.z = x.z;
+			} else {
+				this.x = x;
+				this.y = y;
+				this.z = z;
+			}
+		}
+		this.normalize = function() {
+			let mag = Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
+			this.x /= mag;
+			this.y /= mag;
+			this.z /= mag;
+		}
+		this.add = function(v) {
+			this.x += v.x;
+			this.y += v.y;
+			this.z += v.z;
+		}
+		this.mult = function(m) {
+			this.x *= m;
+			this.y *= m;
+			this.z *= m;
+		}
+	}
+	let fill = function(r, g, b) {
+		if (g === undefined) {
+			g = r;
+			b = r;
+		}
+		ctx.fillStyle = "rgb(" + r + ", " + g + ", " + b + ")"
+	}
+	let stroke = function(r, g, b) {
+		if (g === undefined) {
+			g = r;
+			b = r;
+		}
+		ctx.strokeStyle = "rgb(" + r + ", " + g + ", " + b + ")"
+	}
+	let line = function(x1, y1, x2, y2) {
+		ctx.moveTo(x1, y1);
+		ctx.lineTo(x2, y2);
+	}
+
+	function fastText(txt, x, y, h) {
+		h = h || 0;
+		let lines = txt.split("\n");
+		for (let i = 0; i < lines.length; i++) {
+			ctx.fillText(lines[i], x, y + h * i);
+		}
+	}
+
+	function textSize(size) {
+		ctx.font = size + 'px Monospace';
+	}
+	let text = fastText;
+	let strokeWeight = function(num) {
+		ctx.lineWidth = num;
+	}
+	let ARROW = "arrow";
+	let HAND = "pointer";
+	let CROSS = "crosshair";
+	let cursor = function(type) {
+		canvas.style.cursor = type;
+	}
+	//globals
+	let fov = 90; // Field of view in degrees
+	let version = "Parkour 1.19";
+	let reach = 0; // Max distance player can place or break blocks
+	let blockIds = {};
+	blockData.forEach(function(block) {
+		blockIds[block.name] = block.id;
+	});
+	let currentFov, targetFov, fovTime;
+	let renderDistance = 10;
+	let locked = true;
+	let generatedChunks;
+	let mouseX, mouseY;
+	let width = window.innerWidth;
+	let height = window.innerHeight;
+	let generator = {
+		height: 80, // Height of the hills
+		smooth: 0.01, // Smoothness of the terrain
+		extra: 30, // Extra height added to the world.
+		caveSize: 0.00 // Redefined right above where it's used
+	};
+	let maxHeight = 255;
+	let blockOutlines = false;
+	let blockFill = true;
+	let updateHUD = true;
+	const SLAB = 1;
+	const CUBE = 0;
+	let blockMode = CUBE;
+	let textureMap;
+	let textureCoords;
+	let texCoordsBuffers;
+	let bigArray = win.bigArray || newFloat32Array(200000);
+	win.bigArray = bigArray;
+	let screen;
+	let hitBox = {};
+	let holding = 0;
+	let Key = {};
+	let modelView = win.modelView || newFloat32Array(16);
+	win.modelView = modelView;
+	let glCache;
+	let nearH;
+	let freezeFrame = 0;
+	let p;
+	let speedrunClock = {
+		startTime: 0.0,
+		endTime: 0.0,
+		lastTime: 999.0,
+		running: false,
+		finished: false,
+		startClock: function () {
+			if (this.finished) {
+				return;
+			}
+			if (this.running) {
+				return;
+			}
+			this.startTime = win.performance.now();
+			this.running = true;
+		},
+		getTime: function () {
+			if (this.running) {
+				return (win.performance.now() - this.startTime) / 1000.0;
+			}
+			return this.lastTime / 1000.0;
+		},
+		stopClock: function () {
+			this.lastTime = win.performance.now() - this.startTime;
+			this.running = false;
+			this.finished = false;
+		},
+	};
+	let vec1 = new PVector(),
+		vec2 = new PVector(),
+		vec3 = new PVector();
+	let move = {
+		x: 0,
+		y: 0,
+		z: 0,
+		ang: Math.sqrt(0.5),
+	};
+	let p2 = {
+		x: 0,
+		y: 0,
+		z: 0,
+	};
+	let place;
+	let inventory = {
+		hotbar: [1, 2, 3, 4, 5, 6, 7, 8, 9],
+		main: [],
+		hotbarSlot: 0,
+		size: 40,
+		holding: 0,
+	};
+
+	function play() {
+		screen = "play";
+		getPointer();
+		fill(255, 255, 255);
+		textSize(10);
+		p.lastBreak = Date.now();
+		updateHUD = true;
+		gl.clearColor(84 / 255, 138 / 255, 184 / 255, 1.0);
+		//gl.clearColor(0, 0, 0, 1.0);
+		savebox.hidden = true;
+		saveDirections.hidden = true;
+		message.hidden = true;
+	}
+	let gl;
+
+	function getPointer() {
+		if (canvas.requestPointerLock) {
+			canvas.requestPointerLock();
+		}
+	}
+
+	function releasePointer() {
+		if (doc.exitPointerLock) {
+			doc.exitPointerLock();
+		}
+	}
+	let Block = {
+		top: 0x4,
+		bottom: 0x8,
+		north: 0x20,
+		south: 0x10,
+		east: 0x2,
+		west: 0x1,
+	};
+	let Sides = {
+		top: 0,
+		bottom: 1,
+		north: 2,
+		south: 3,
+		east: 4,
+		west: 5,
+	};
+	//GLSL Shader code
+	let vertexShaderSrc3D = document.getElementById("vertex-shader").text;
+	let fragmentShaderSrc3D = document.getElementById("fragment-shader").text;
+	let createProgramObject = function(curContext, vetexShaderSource, fragmentShaderSource) {
+		let vertexShaderObject = curContext.createShader(curContext.VERTEX_SHADER);
+		curContext.shaderSource(vertexShaderObject, vetexShaderSource);
+		curContext.compileShader(vertexShaderObject);
+		if (!curContext.getShaderParameter(vertexShaderObject, curContext.COMPILE_STATUS)) {
+			throw curContext.getShaderInfoLog(vertexShaderObject);
+		}
+		let fragmentShaderObject = curContext.createShader(curContext.FRAGMENT_SHADER);
+		curContext.shaderSource(fragmentShaderObject, fragmentShaderSource);
+		curContext.compileShader(fragmentShaderObject);
+		if (!curContext.getShaderParameter(fragmentShaderObject, curContext.COMPILE_STATUS)) {
+			throw curContext.getShaderInfoLog(fragmentShaderObject);
+		}
+		let programObject = curContext.createProgram();
+		curContext.attachShader(programObject, vertexShaderObject);
+		curContext.attachShader(programObject, fragmentShaderObject);
+		curContext.linkProgram(programObject);
+		if (!curContext.getProgramParameter(programObject, curContext.LINK_STATUS)) {
+			throw "Error linking shaders.";
+		}
+		return programObject;
+	};
+	let programObject3D;
+	let baseTextureVertices = [
+		[1, 0, 0, 0, 0, 1, 1, 1],
+		[1, 0, 0, 0, 0, 1, 1, 1],
+		[1, 0, 0, 0, 0, 1, 1, 1],
+		[1, 0, 0, 0, 0, 1, 1, 1],
+		[0, 1, 0, 0, 1, 0, 1, 1],
+		[0, 1, 0, 0, 1, 0, 1, 1]
+	]
+	let shapes = {
+		/*
+			[
+				[[west, bottom, south, east, bottom, south, east, bottom, north, west, bottom, north]],
+				[[west, top,    south, west, top,    north, east, top,    north, east, top,    south]],
+				[[east, top,    north, west, top,    north, west, bottom, north, east, bottom, north]],
+				[[west, top,    south, east, top,    south, east, bottom, south, west, bottom, south]],
+				[[]],
+				[[]]
+			]
+			[
+				[(-x, -z), (+x, -z), (+x, +z), (-x, +z)], // minX = 0,  minZ = 2,  maxX = 6, maxZ = 8
+				[(-x, -z), (-x, +z), (+x, +z), (+x, -z)], // minX = 0,  minZ = 2,  maxX = 6, maxZ = 8
+				[(+x, +y), (-x, +y), (-x, -y), (+x, -y)], // minX = 6,  minY = 7,  maxX = 0, maxY = 1
+				[(-x, +y), (+x, +y), (+x, -y), (-x, -y)], // minX = 9,  minY = 10, maxX = 3, maxY = 4
+				[(+y, -z), (+y, +z), (-y, +z), (-y, -z)], // minY = 10, minZ = 11, maxY = 4, maxZ = 5
+				[(+y, +z), (+y, -z), (-y, -z), (-y, +z)]  // minY = 7,  minZ = 8,  maxY = 1, maxZ = 2
+			]
+			*/
+		cube: {
+			verts: [
+				[
+					[-0.5, -0.5, -0.5, 0.5, -0.5, -0.5, 0.5, -0.5, 0.5, -0.5, -0.5, 0.5]
+				], //bottom
+				[
+					[-0.5, 0.5, -0.5, -0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, -0.5]
+				], //top
+				[
+					[0.5, 0.5, 0.5, -0.5, 0.5, 0.5, -0.5, -0.5, 0.5, 0.5, -0.5, 0.5]
+				], //north
+				[
+					[-0.5, 0.5, -0.5, 0.5, 0.5, -0.5, 0.5, -0.5, -0.5, -0.5, -0.5, -0.5]
+				], //south
+				[
+					[0.5, 0.5, -0.5, 0.5, 0.5, 0.5, 0.5, -0.5, 0.5, 0.5, -0.5, -0.5]
+				], //east
+				[
+					[-0.5, 0.5, 0.5, -0.5, 0.5, -0.5, -0.5, -0.5, -0.5, -0.5, -0.5, 0.5]
+				] //west
+			],
+			texVerts: [],
+			buffer: null,
+			size: 6
+		},
+		slab: {
+			verts: [
+				[
+					[-0.5, -0.5, -0.5, 0.5, -0.5, -0.5, 0.5, -0.5, 0.5, -0.5, -0.5, 0.5]
+				], //bottom
+				[
+					[-0.5, 0.0, -0.5, -0.5, 0.0, 0.5, 0.5, 0.0, 0.5, 0.5, 0.0, -0.5]
+				], //top
+				[
+					[0.5, 0.0, 0.5, -0.5, 0.0, 0.5, -0.5, -0.5, 0.5, 0.5, -0.5, 0.5]
+				], //north
+				[
+					[-0.5, 0.0, -0.5, 0.5, 0.0, -0.5, 0.5, -0.5, -0.5, -0.5, -0.5, -0.5]
+				], //south
+				[
+					[0.5, 0.0, -0.5, 0.5, 0.0, 0.5, 0.5, -0.5, 0.5, 0.5, -0.5, -0.5]
+				], //east
+				[
+					[-0.5, 0.0, 0.5, -0.5, 0.0, -0.5, -0.5, -0.5, -0.5, -0.5, -0.5, 0.5]
+				] //west
+			],
+			texVerts: [],
+			buffer: null,
+			size: 6
+		}
+	};
+
+	function initShapes() {
+		function mapCoords(verts, index, obj, x, y, z) {
+			let cx = 0;
+			let cy = 0;
+			let n = 0;
+			let texArrayOuter = [];
+			let baseArr = shapes.cube.verts[index][0];
+			const texWidth = 1 / 16;
+			const abs = Math.abs;
+			verts[index].forEach(function(arr) {
+				let texArr = []
+				for (let i = 0, j = 0; i < arr.length;) {
+					if (x) cx = abs(baseTextureVertices[index][j++] - abs(baseArr[i] - arr[i])) * texWidth;
+					i++;
+					if (y) cy = abs(baseTextureVertices[index][j++] - abs(baseArr[i] - arr[i])) * texWidth;
+					i++;
+					if (z) {
+						n = abs(baseTextureVertices[index][j++] - abs(baseArr[i] - arr[i])) * texWidth;
+						if (y) cx = n;
+						else cy = n;
+					}
+					i++
+					texArr.push(cx, cy);
+				}
+				texArrayOuter.push(texArr);
+			})
+			obj.texVerts.push(texArrayOuter);
+		}
+		for (let shape in shapes) {
+			let obj = shapes[shape];
+			let verts = obj.verts;
+			mapCoords(verts, 0, obj, true, false, true);
+			mapCoords(verts, 1, obj, true, false, true);
+			mapCoords(verts, 2, obj, true, true, false);
+			mapCoords(verts, 3, obj, true, true, false);
+			mapCoords(verts, 4, obj, false, true, true);
+			mapCoords(verts, 5, obj, false, true, true);
+			obj.buffer = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER, obj.buffer);
+			gl.bufferData(gl.ARRAY_BUFFER, newFloat32Array(verts.flat(2)), gl.STATIC_DRAW);
+		}
+	}
+	let indexOrder;
+	(function() {
+		let arr = [];
+		for (let i = 0; i < 40000; i++) {
+			arr.push(0 + i * 4, 1 + i * 4, 2 + i * 4, 0 + i * 4, 2 + i * 4, 3 + i * 4);
+		}
+		indexOrder = newUint32Array(arr);
+	})();
+	let hexagonVerts;
+	let slabIconVerts;
+	let blockIcons;
+	(function() {
+		let side = Math.sqrt(3) / 2;
+		hexagonVerts = newFloat32Array([
+			0, 1, 1, side, 0.5, 1, 0, 0, 1, -side, 0.5, 1,
+			0, 0, 1, side, 0.5, 1, side, -0.5, 1, 0, -1, 1, -side, 0.5, 1, 0, 0, 1, 0, -1, 1, -side, -0.5, 1,
+		]);
+		slabIconVerts = newFloat32Array([
+			0, 0.5, 1, side, 0, 1, 0, -0.5, 1, -side, 0, 1,
+			0, -0.5, 1, side, 0, 1, side, -0.5, 1, 0, -1, 1, -side, 0, 1, 0, -0.5, 1, 0, -1, 1, -side, -0.5, 1,
+		]);
+	})();
+
+	function genIcons() {
+		blockIcons = [null];
+		let texOrder = [1, 2, 3];
+		let shadows = [1, 0.7, 0.4];
+		let scale = 0.16 / height * inventory.size;
+		for (let i = 1; i < blockData.length; i++) {
+			let data = [];
+			let block = blockData[i];
+			for (let j = 0; j < 12; j++) {
+				data.push(hexagonVerts[j * 3 + 0] * scale);
+				data.push(hexagonVerts[j * 3 + 1] * scale);
+				data.push(0.1666666);
+				data.push(textureCoords[textureMap[block.textures[texOrder[Math.floor(j / 4)]]]][(j * 2 + 0) % 8]);
+				data.push(textureCoords[textureMap[block.textures[texOrder[Math.floor(j / 4)]]]][(j * 2 + 1) % 8]);
+				data.push(shadows[Math.floor(j / 4)]);
+			}
+			let buffer = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+			gl.bufferData(gl.ARRAY_BUFFER, newFloat32Array(data), gl.STATIC_DRAW);
+			blockIcons[i] = buffer;
+			data = [];
+			for (let j = 0; j < 12; j++) {
+				data.push(slabIconVerts[j * 3 + 0] * scale);
+				data.push(slabIconVerts[j * 3 + 1] * scale);
+				data.push(0.1666666);
+				data.push(textureCoords[textureMap[block.textures[texOrder[Math.floor(j / 4)]]]][(j * 2 + 0) % 8]);
+				data.push(textureCoords[textureMap[block.textures[texOrder[Math.floor(j / 4)]]]][(j * 2 + 1) % 8]);
+				data.push(shadows[Math.floor(j / 4)]);
+			}
+			buffer = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+			gl.bufferData(gl.ARRAY_BUFFER, newFloat32Array(data), gl.STATIC_DRAW);
+			blockIcons[i | 128] = buffer;
+		}
+	}
+
+	function uniformMatrix(cacheId, programObj, vrName, transpose, matrix) {
+		let vrLocation = glCache.locations[cacheId];
+		if (vrLocation === undefined) {
+			vrLocation = gl.getUniformLocation(programObj, vrName);
+			glCache.locations[cacheId] = vrLocation;
+		}
+		gl.uniformMatrix4fv(vrLocation, transpose, matrix);
+	}
+
+	function vertexAttribPointer(cacheId, programObj, vrName, size, VBO) {
+		let vrLocation = glCache.locations[cacheId];
+		if (vrLocation === undefined) {
+			vrLocation = gl.getAttribLocation(programObj, vrName);
+			glCache.locations[cacheId] = vrLocation;
+		}
+		if (vrLocation !== -1) {
+			gl.enableVertexAttribArray(vrLocation);
+			gl.bindBuffer(gl.ARRAY_BUFFER, VBO);
+			gl.vertexAttribPointer(vrLocation, size, gl.FLOAT, false, 0, 0);
+		}
+	}
+	//Generate buffers for every block face and store them
+	let sideEdgeBuffers;
+	let indexBuffer;
+	/** Matrix and Vector transformation methods **/
+	let matrix = newFloat32Array(16);
+	let projection = win.projection || newFloat32Array(16);
+	win.projection = projection;
+
+	function trans(matrix, x, y, z) {
+		let a = matrix;
+		a[3] += a[0] * x + a[1] * y + a[2] * z;
+		a[7] += a[4] * x + a[5] * y + a[6] * z;
+		a[11] += a[8] * x + a[9] * y + a[10] * z;
+		a[15] += a[12] * x + a[13] * y + a[14] * z;
+	}
+
+	function rotX(matrix, angle) {
+		// source = [1, 0, 0, 0, 0, c, -s, 0, 0, s, c, 0, 0, 0, 0, 1]
+		let elems = matrix;
+		let c = Math.cos(angle);
+		let s = Math.sin(angle);
+		let t = elems[1];
+		elems[1] = t * c + elems[2] * s;
+		elems[2] = t * -s + elems[2] * c;
+		t = elems[5];
+		elems[5] = t * c + elems[6] * s;
+		elems[6] = t * -s + elems[6] * c;
+		t = elems[9];
+		elems[9] = t * c + elems[10] * s;
+		elems[10] = t * -s + elems[10] * c;
+		t = elems[13];
+		elems[13] = t * c + elems[14] * s;
+		elems[14] = t * -s + elems[14] * c;
+	}
+
+	function rotY(matrix, angle) {
+		//source = c, 0, s, 0, 0, 1, 0, 0, -s, 0, c, 0, 0, 0, 0, 1
+		let c = Math.cos(angle);
+		let s = Math.sin(angle);
+		let elems = matrix;
+		let t = elems[0];
+		elems[0] = t * c + elems[2] * -s;
+		elems[2] = t * s + elems[2] * c;
+		t = elems[4];
+		elems[4] = t * c + elems[6] * -s;
+		elems[6] = t * s + elems[6] * c;
+		t = elems[8];
+		elems[8] = t * c + elems[10] * -s;
+		elems[10] = t * s + elems[10] * c;
+		t = elems[12];
+		elems[12] = t * c + elems[14] * -s;
+		elems[14] = t * s + elems[14] * c;
+	}
+
+	function transpose(matrix) {
+		let temp = matrix[4];
+		matrix[4] = matrix[1];
+		matrix[1] = temp;
+		temp = matrix[8];
+		matrix[8] = matrix[2];
+		matrix[2] = temp;
+		temp = matrix[6];
+		matrix[6] = matrix[9];
+		matrix[9] = temp;
+		temp = matrix[3];
+		matrix[3] = matrix[12];
+		matrix[12] = temp;
+		temp = matrix[7];
+		matrix[7] = matrix[13];
+		matrix[13] = temp;
+		temp = matrix[11];
+		matrix[11] = matrix[14];
+		matrix[14] = temp;
+	}
+
+	function matMult() {
+		//Multiply the projection matrix by the view matrix; this is optimized specifically for these matrices by removing terms that are always 0.
+		let proj = projection;
+		let view = modelView;
+		matrix[0] = proj[0] * view[0];
+		matrix[1] = proj[0] * view[1];
+		matrix[2] = proj[0] * view[2];
+		matrix[3] = proj[0] * view[3];
+		matrix[4] = proj[5] * view[4];
+		matrix[5] = proj[5] * view[5];
+		matrix[6] = proj[5] * view[6];
+		matrix[7] = proj[5] * view[7];
+		matrix[8] = proj[10] * view[8] + proj[11] * view[12];
+		matrix[9] = proj[10] * view[9] + proj[11] * view[13];
+		matrix[10] = proj[10] * view[10] + proj[11] * view[14];
+		matrix[11] = proj[10] * view[11] + proj[11] * view[15];
+		matrix[12] = proj[14] * view[8];
+		matrix[13] = proj[14] * view[9];
+		matrix[14] = proj[14] * view[10];
+		matrix[15] = proj[14] * view[11];
+	}
+
+	function copyArr(a, b) {
+		for (let i = 0; i < a.length; i++) {
+			b[i] = a[i];
+		}
+	}
+
+	function FOV(fov) {
+		let tang = Math.tan(fov * 0.5 * Math.PI / 180);
+		let scale = 1 / tang;
+		let near = 1;
+		let far = 1000000;
+		currentFov = fov;
+		nearH = near * tang;
+		projection[0] = scale / width * height;
+		projection[5] = scale;
+		projection[10] = -far / (far - near);
+		projection[11] = -1;
+		projection[14] = -far * near / (far - near);
+		// Set the projecction matrix in the shader
+		// copyArr(projection, matrix);
+		// transpose(matrix);
+		// uniformMatrix("projection3d", programObject3D, "uProjection", false, matrix);
+	}
+
+	function cross(v1, v2, result) {
+		let x = v1.x,
+			y = v1.y,
+			z = v1.z,
+			x2 = v2.x,
+			y2 = v2.y,
+			z2 = v2.z;
+		result.x = y * z2 - y2 * z;
+		result.y = z * x2 - z2 * x;
+		result.z = x * y2 - x2 * y;
+	}
+
+	function Plane(nx, ny, nz) {
+		this.dx = nx > 0 ? 16 : 0;
+		this.dy = ny > 0;
+		this.dz = nz > 0 ? 16 : 0;
+		// Normal vector
+		this.nx = nx;
+		this.ny = ny;
+		this.nz = nz;
+	}
+	Plane.prototype.set = Plane;
+
+	function computeFrustum() {
+		let X = vec1;
+		X.x = p.direction.z;
+		X.y = 0
+		X.z = -p.direction.x;
+		X.normalize();
+		let Y = vec2;
+		Y.set(p.direction);
+		Y.mult(-1);
+		cross(Y, X, Y);
+		//Near plane (hoisted to outside the render loop to improve performance)
+		// var x = p.x + p.direction.x;
+		// var y = p.y + p.direction.y;
+		// var z = p.z + p.direction.z;
+		// p.frustum[0].set(x, y, z, p.direction.x, p.direction.y, p.direction.z);
+		let aux = vec3;
+		aux.set(Y);
+		aux.mult(nearH);
+		aux.add(p.direction);
+		aux.normalize();
+		cross(aux, X, aux);
+		p.frustum[0].set(aux.x, aux.y, aux.z);
+		aux.set(Y);
+		aux.mult(-nearH);
+		aux.add(p.direction);
+		aux.normalize();
+		cross(X, aux, aux);
+		p.frustum[1].set(aux.x, aux.y, aux.z);
+		aux.set(X);
+		aux.mult(-nearH * width / height);
+		aux.add(p.direction);
+		aux.normalize();
+		cross(aux, Y, aux);
+		p.frustum[2].set(aux.x, aux.y, aux.z);
+		aux.set(X);
+		aux.mult(nearH * width / height);
+		aux.add(p.direction);
+		aux.normalize();
+		cross(Y, aux, aux);
+		p.frustum[3].set(aux.x, aux.y, aux.z);
+	}
+	let chunkVisible = function(x, y, z, maxY) {
+		x -= 0.5;
+		y -= 0.5;
+		z -= 0.5;
+		maxY += 0.5;
+		let px = 0,
+			py = 0,
+			pz = 0,
+			plane = null;
+		let cx = p.x,
+			cy = p.y,
+			cz = p.z;
+		for (let i = 0; i < 4; i++) {
+			plane = p.frustum[i];
+			px = x + plane.dx;
+			py = plane.dy ? maxY : y;
+			pz = z + plane.dz;
+			if ((px - cx) * plane.nx + (py - cy) * plane.ny + (pz - cz) * plane.nz < 0) {
+				return false;
+			}
+		}
+		return true;
+	};
+	let defaultModelView = newFloat32Array([-10, 0, 0, 0, 0, 10, 0, 0, 0, 0, -10, 0, 0, 0, 0, 1]);
+	let initModelView = function(x, y, z, rx, ry) {
+		copyArr(defaultModelView, modelView);
+		rotX(modelView, rx);
+		rotY(modelView, ry);
+		trans(modelView, -x, -y, -z);
+		matMult();
+		transpose(matrix);
+		uniformMatrix("view3d", programObject3D, "uView", false, matrix);
+	};
+	let tex;
+
+	function roundBits(number) {
+		return Math.round(number * 1000000) / 1000000;
+	}
+
+	function rayTrace(x, y, z, shape) {
+		let cf, cd = 1e9; //Closest face and distance
+		let m; //Absolute distance to intersection point
+		let ix, iy, iz; //Intersection coords
+		let minX, miny, minz, maxX, maxY, maxZ; //Bounds of face coordinates
+		let east = p.direction.x < 0;
+		let top = p.direction.y < 0;
+		let north = p.direction.z < 0;
+		let verts = shape.verts;
+		let faces = verts[0];
+		//Top and bottom faces
+		minX = 0;
+		minZ = 2;
+		maxX = 6;
+		maxZ = 8;
+		if (top) {
+			faces = verts[1]
+		}
+		if (p.direction.y) {
+			for (let face of faces) {
+				m = (y + face[1] - p.y) / p.direction.y;
+				ix = m * p.direction.x + p.x;
+				iz = m * p.direction.z + p.z;
+				if (m > 0 && m < cd && ix >= x + face[minX] && ix <= x + face[maxX] && iz >= z + face[minZ] && iz <= z + face[maxZ]) {
+					cd = m; //Ray crosses bottom face
+					cf = top ? "top" : "bottom";
+				}
+			}
+		}
+		//West and East faces
+		if (east) {
+			faces = verts[4];
+			minY = 10;
+			minZ = 11;
+			maxY = 4;
+			maxZ = 5;
+		} else {
+			faces = verts[5];
+			minY = 7;
+			minZ = 8;
+			maxY = 1;
+			maxZ = 2;
+		}
+		if (p.direction.x) {
+			for (let face of faces) {
+				m = (x + face[0] - p.x) / p.direction.x;
+				iy = m * p.direction.y + p.y;
+				iz = m * p.direction.z + p.z;
+				if (m > 0 && m < cd && iy >= y + face[minY] && iy <= y + face[maxY] && iz >= z + face[minZ] && iz <= z + face[maxZ]) {
+					cd = m;
+					cf = east ? "east" : "west";
+				}
+			}
+		}
+		//South and North faces
+		if (north) {
+			faces = verts[2];
+			minX = 6;
+			minY = 7;
+			maxX = 0;
+			maxY = 1;
+		} else {
+			faces = verts[3];
+			minX = 9;
+			minY = 10;
+			maxX = 3;
+			maxY = 4;
+		}
+		if (p.direction.z) {
+			for (let face of faces) {
+				m = (z + face[2] - p.z) / p.direction.z;
+				ix = m * p.direction.x + p.x;
+				iy = m * p.direction.y + p.y;
+				if (m > 0 && m < cd && ix >= x + face[minX] && ix <= x + face[maxX] && iy >= y + face[minY] && iy <= y + face[maxY]) {
+					cd = m;
+					cf = north ? "north" : "south";
+				}
+			}
+		}
+		return [cd, cf];
+	}
+
+	function runRayTrace(x, y, z) {
+		let block = world.getBlock(x, y, z);
+		if (block) {
+			let slab = (block & 0x80) >> 7;
+			let rt = rayTrace(x, y, z, slab ? shapes.slab : shapes.cube);
+			if (rt[1] && rt[0] < hitBox.closest) {
+				hitBox.closest = rt[0];
+				hitBox.face = rt[1];
+				hitBox.pos = [x, y, z];
+				hitBox.shape = slab ? "slab" : "cube";
+			}
+		}
+	}
+
+	function lookingAt() {
+		// Checks blocks in front of the player to see which one they're looking at
+		hitBox.pos = null;
+		hitBox.closest = 1e9;
+		let blockState = world.getBlock(p2.x, p2.y, p2.z);
+		if (blockState) {
+			hitBox.pos = [p2.x, p2.y, p2.z];
+			hitBox.closest = 0;
+			hitBox.shape = (blockState & 0x80) ? "slab" : "cube";
+			return;
+		}
+		let pd = p.direction;
+		// Target block
+		let tx = Math.round(pd.x * reach + p.x);
+		let ty = Math.round(pd.y * reach + p.y);
+		let tz = Math.round(pd.z * reach + p.z);
+		let minX = p2.x;
+		let maxX = 0;
+		let minY = p2.y;
+		let maxY = 0;
+		let minZ = p2.z;
+		let maxZ = 0;
+		for (let i = 0; i < reach + 1; i++) {
+			if (i > reach) {
+				i = reach;
+			}
+			maxX = Math.round(p.x + pd.x * i);
+			maxY = Math.round(p.y + pd.y * i);
+			maxZ = Math.round(p.z + pd.z * i);
+			if (maxX === minX && maxY === minY && maxZ === minZ) {
+				continue;
+			}
+			if (minX !== maxX) {
+				if (minY !== maxY) {
+					if (minZ !== maxZ) {
+						runRayTrace(maxX, maxY, maxZ);
+					}
+					runRayTrace(maxX, maxY, minZ);
+				}
+				if (minZ !== maxZ) {
+					runRayTrace(maxX, minY, maxZ);
+				}
+				runRayTrace(maxX, minY, minZ);
+			}
+			if (minY !== maxY) {
+				if (minZ !== maxZ) {
+					runRayTrace(minX, maxY, maxZ);
+				}
+				runRayTrace(minX, maxY, minZ);
+			}
+			if (minZ !== maxZ) {
+				runRayTrace(minX, minY, maxZ);
+			}
+			if (hitBox.pos) {
+				return; //The ray has collided; it can't possibly find a closer collision now
+			}
+			minZ = maxZ;
+			minY = maxY;
+			minX = maxX;
+		}
+	}
+	let inBox = function(x, y, z, w, h, d) {
+		let iy = y - h / 2 - p.topH;
+		let ih = h + p.bottomH + p.topH;
+		let ix = x - w / 2 - p.w;
+		let iw = w + p.w * 2;
+		let iz = z - d / 2 - p.w;
+		let id = d + p.w * 2;
+		return p.x > ix && p.y > iy && p.z > iz && p.x < ix + iw && p.y < iy + ih && p.z < iz + id;
+	};
+	let onBox = function(x, y, z, w, h, d) {
+		let iy = roundBits(y - h / 2 - p.topH);
+		let ih = roundBits(h + p.bottomH + p.topH);
+		let ix = roundBits(x - w / 2 - p.w);
+		let iw = roundBits(w + p.w * 2);
+		let iz = roundBits(z - d / 2 - p.w);
+		let id = roundBits(d + p.w * 2);
+		return p.x > ix && p.y > iy && p.z > iz && p.x < ix + iw && p.y <= iy + ih && p.z < iz + id;
+	};
+
+	function collided(x, y, z, vx, vy, vz, block) {
+		let verts = shapes[(block & 0x80) ? "slab" : "cube"].verts;
+		let px = roundBits(p.x - p.w - x);
+		let py = roundBits(p.y - p.bottomH - y);
+		let pz = roundBits(p.z - p.w - z);
+		let pxx = roundBits(p.x + p.w - x);
+		let pyy = roundBits(p.y + p.topH - y);
+		let pzz = roundBits(p.z + p.w - z);
+		//Top and bottom faces
+		let minX = 0;
+		let minZ = 2;
+		let maxX = 6;
+		let maxZ = 8;
+		let faces = verts[0];
+		if (!vx && !vz) {
+			if (vy <= 0) {
+				faces = verts[1];
+			}
+			for (let face of faces) {
+				if (face[1] > py && face[1] < pyy && face[minX] < pxx && face[maxX] > px && face[minZ] < pzz && face[maxZ] > pz) {
+					if (vy <= 0) {
+						p.onGround = true;
+						p.y = Math.round((face[1] + y + p.bottomH) * 10000) / 10000;
+						return false;
+					} else {
+						return true;
+					}
+				}
+			}
+			return false;
+		}
+		//West and East faces
+		let minY = 0;
+		let maxY = 0;
+		if (vx < 0) {
+			faces = verts[4];
+			minY = 10;
+			minZ = 11;
+			maxY = 4;
+			maxZ = 5;
+		} else if (vx > 0) {
+			faces = verts[5];
+			minY = 7;
+			minZ = 8;
+			maxY = 1;
+			maxZ = 2;
+		}
+		if (vx) {
+			for (let face of faces) {
+				if (face[0] > px && face[0] < pxx && face[minY] < pyy && face[maxY] > py && face[minZ] < pzz && face[maxZ] > pz) {
+					if (face[maxY] - py > 0.5) {
+						p.canStep = false;
+					}
+					return true;
+				}
+			}
+			return false;
+		}
+		//South and North faces
+		if (vz < 0) {
+			faces = verts[2];
+			minX = 6;
+			minY = 7;
+			maxX = 0;
+			maxY = 1;
+		} else if (vz > 0) {
+			faces = verts[3];
+			minX = 9;
+			minY = 10;
+			maxX = 3;
+			maxY = 4;
+		}
+		if (vz) {
+			for (let face of faces) {
+				if (face[2] > pz && face[2] < pzz && face[minY] < pyy && face[maxY] > py && face[minX] < pxx && face[maxX] > px) {
+					if (face[maxY] - py > 0.5) {
+						p.canStep = false;
+					}
+					return true;
+				}
+			}
+			return false;
+		}
+	};
+	let contacts = {
+		array: [],
+		size: 0,
+		add: function(x, y, z, block) {
+			if (this.size === this.array.length) {
+				this.array.push([x, y, z, block]);
+			} else {
+				this.array[this.size][0] = x;
+				this.array[this.size][1] = y;
+				this.array[this.size][2] = z;
+				this.array[this.size][3] = block;
+			}
+			this.size++;
+		},
+		clear: function() {
+			this.size = 0;
+		},
+	};
+	let resolveContactsAndUpdatePosition = function() {
+		let pminX = p2.x - 1;
+		let pmaxX = p2.x + 1;
+		let pminY = p2.y - 2;
+		let pmaxY = p2.y + 1;
+		let pminZ = p2.z - 1;
+		let pmaxZ = p2.z + 1;
+		let block = null;
+		let vel = p.velocity;
+		for (let x = pminX; x <= pmaxX; x++) {
+			for (let y = pminY; y <= pmaxY; y++) {
+				for (let z = pminZ; z <= pmaxZ; z++) {
+					let block = world.getBlock(x, y, z)
+					if (block) {
+						contacts.add(x, y, z, block);
+					}
+				}
+			}
+		}
+		let dt = (win.performance.now() - p.lastUpdate) / 33;
+		dt = dt > 2 ? 2 : dt;
+		p.previousX = p.x;
+		p.previousY = p.y;
+		p.previousZ = p.z;
+		//Check collisions in the Y direction
+		p.onGround = false;
+		p.canStep = false;
+		p.y += vel.y * dt;
+		for (let i = 0; i < contacts.size; i++) {
+			block = contacts.array[i];
+			if (collided(block[0], block[1], block[2], 0, vel.y, 0, block[3])) {
+				p.y = p.previousY;
+				vel.y = 0;
+				break;
+			}
+		}
+		if (p.y === p.previousY) {
+			p.canStep = true;
+		}
+		var sneakLock = false,
+			sneakSafe = false;
+		if (p.sneaking) {
+			for (let i = 0; i < contacts.size; i++) {
+				block = contacts.array[i];
+				if (onBox(block[0], block[1], block[2], 1, 1, 1)) {
+					sneakLock = true;
+					break;
+				}
+			}
+		}
+		//Check collisions in the X direction
+		p.x += vel.x * dt;
+		for (let i = 0; i < contacts.size; i++) {
+			block = contacts.array[i];
+			if (collided(block[0], block[1], block[2], vel.x, 0, 0, block[3])) {
+				if (p.canStep && !world.getBlock(block[0], block[1] + 1, block[2]) && !world.getBlock(block[0], block[1] + 2, block[2])) {
+					collided(block[0], block[1], block[2], 0, vel.y, 0, block[3]);
+					break;
+				}
+				p.x = p.previousX;
+				vel.x = 0;
+				break;
+			}
+			if (sneakLock && onBox(block[0], block[1], block[2], 1, 1, 1)) {
+				sneakSafe = true;
+			}
+		}
+		if (sneakLock && !sneakSafe) {
+			p.x = p.previousX;
+			vel.x = 0;
+		}
+		sneakSafe = false;
+		//Check collisions in the Z direction
+		p.z += vel.z * dt;
+		for (let i = 0; i < contacts.size; i++) {
+			block = contacts.array[i];
+			if (collided(block[0], block[1], block[2], 0, 0, vel.z, block[3])) {
+				if (p.canStep && !world.getBlock(block[0], block[1] + 1, block[2]) && !world.getBlock(block[0], block[1] + 2, block[2])) {
+					collided(block[0], block[1], block[2], 0, vel.y, 0, block[3]);
+					break;
+				}
+				p.z = p.previousZ;
+				vel.z = 0;
+				break;
+			}
+			if (sneakLock && onBox(block[0], block[1], block[2], 1, 1, 1)) {
+				sneakSafe = true;
+			}
+		}
+		if (sneakLock && !sneakSafe) {
+			p.z = p.previousZ;
+			vel.z = 0;
+		}
+		if (!p.flying) {
+			let drag = p.onGround ? 0.5 : 0.85;
+			p.velocity.z += (p.velocity.z * drag - p.velocity.z) * dt;
+			p.velocity.x += (p.velocity.x * drag - p.velocity.x) * dt;
+		} else {
+			let drag = 0.9;
+			p.velocity.z += (p.velocity.z * drag - p.velocity.z) * dt;
+			p.velocity.x += (p.velocity.x * drag - p.velocity.x) * dt;
+			p.velocity.y += (p.velocity.y * 0.8 - p.velocity.y) * dt;
+			if (p.onGround) {
+				p.flying = false;
+			}
+		}
+		p.lastUpdate = win.performance.now();
+		contacts.clear();
+		lookingAt();
+	};
+	let runGravity = function() {
+		if (p.flying) {
+			return;
+		}
+		let dt = (win.performance.now() - p.lastUpdate) / 33;
+		dt = dt > 2 ? 2 : dt;
+		if (p.onGround) {
+			if (Key[" "]) {
+				p.velocity.y = p.jumpSpeed;
+				p.onGround = false;
+			} else {
+				p.velocity.y = 0;
+			}
+		} else {
+			p.velocity.y += p.gravityStength * dt;
+			if (p.velocity.y < -p.maxYVelocity) {
+				p.velocity.y = -p.maxYVelocity;
+			}
+		}
+	};
+
+	function box2(sides, tex) {
+		if (blockFill) {
+			let i = 0;
+			for (let side in Block) {
+				if (sides & Block[side]) {
+					vertexAttribPointer("aVertex", programObject3D, "aVertex", 3, sideEdgeBuffers[Sides[side]]);
+					vertexAttribPointer("aTexture", programObject3D, "aTexture", 2, texCoordsBuffers[textureMap[tex[i]]]);
+					gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, 0);
+				}
+				i++;
+			}
+		}
+		if (blockOutlines) {
+			vertexAttribPointer("aVertex", programObject3D, "aVertex", 3, shapes[hitBox.shape].buffer);
+			vertexAttribPointer("aTexture", programObject3D, "aTexture", 2, texCoordsBuffers[textureMap.hitbox]);
+			for (let i = 0; i < shapes[hitBox.shape].size; i++) {
+				gl.drawArrays(gl.LINE_LOOP, i * 4, 4);
+			}
+		}
+	}
+
+	function block2(x, y, z, t) {
+		copyArr(modelView, matrix);
+		trans(modelView, x, y, z);
+		matMult();
+		trans(modelView, -x, -y, -z);
+		transpose(matrix);
+		uniformMatrix("view3d", programObject3D, "uView", false, matrix);
+		box2(0xff, blockData[t].textures);
+	}
+	let changeWorldBlock = function(t) {
+		let pos = hitBox.pos;
+		if (pos && pos[1] > 0 && pos[1] < maxHeight) {
+			world.setBlock(hitBox.pos[0], hitBox.pos[1], hitBox.pos[2], t);
+			if (t) {
+				p.lastPlace = Date.now();
+			} else {
+				p.lastBreak = Date.now();
+			}
+		}
+	};
+	let newWorldBlock = function() {
+		if (!hitBox.pos || !holding) {
+			return;
+		}
+		let pos = hitBox.pos,
+			x = pos[0],
+			y = pos[1],
+			z = pos[2];
+		switch (hitBox.face) {
+			case "top":
+				y += 1;
+				break;
+			case "bottom":
+				y -= 1;
+				break;
+			case "south":
+				z -= 1;
+				break;
+			case "north":
+				z += 1;
+				break;
+			case "west":
+				x -= 1;
+				break;
+			case "east":
+				x += 1;
+				break;
+		}
+		if (!inBox(x, y, z, 1, 1, 1) && !world.getBlock(x, y, z)) {
+			pos[0] = x;
+			pos[1] = y;
+			pos[2] = z;
+			changeWorldBlock(holding | blockMode << 7);
+		}
+	};
+	let sphere;
+	(function() {
+		let blocks = [];
+		let radius = 3.5;
+		let radsq = radius * radius;
+		for (let i = -radius; i <= radius; i++) {
+			for (let j = -radius; j <= radius; j++) {
+				for (let k = -radius; k <= radius; k++) {
+					if (i * i + j * j + k * k < radsq) {
+						blocks.push(i | 0, j | 0, k | 0);
+					}
+				}
+			}
+		}
+		sphere = new Int8Array(blocks);
+	})();
+	generator.caveSize = 0.0055;
+
+	function isCave(x, y, z) {
+		return false;
+	}
+
+	function carveSphere(x, y, z) {
+		if (y > 3) {
+			for (let i = 0; i < sphere.length; i += 3) {
+				world.setBlock(x + sphere[i], y + sphere[i + 1], z + sphere[i + 2], blockIds.air, true);
+			}
+		}
+	}
+	let renderedChunks = 0;
+
+	function getBlock(x, y, z, blocks) {
+		return blocks[((x >> 4) + 1) * 9 + ((y >> 4) + 1) * 3 + (z >> 4) + 1][((x & 15) << 8) + ((y & 15) << 4) + (z & 15)] & 127;
+	}
+
+	function getBlock2(x, y, z, blocks) {
+		return blocks[((x >> 4) + 1) * 9 + ((y >> 4) + 1) * 3 + (z >> 4) + 1][((x & 15) << 8) + ((y & 15) << 4) + (z & 15)] & 0xff;
+	}
+
+	function hideFace(x, y, z, blocks, type, func) {
+		let block = func.call(world, x, y, z, blocks);
+		let data = blockData[block & 127]
+		if (!block || block !== type && data.transparent || data.transparent && data.shadow || (block & 128)) {
+			return 1;
+		}
+		return 0;
+	}
+	let getShadows = {
+		shade: [1, 0.85, 0.7, 0.6, 0.3],
+		top: function(x, y, z, block) {
+			let blocks = [
+				blockData[getBlock(x - 1, y - 1, z - 1, block)].shadow,
+				blockData[getBlock(x, y - 1, z - 1, block)].shadow,
+				blockData[getBlock(x + 1, y - 1, z - 1, block)].shadow,
+				blockData[getBlock(x - 1, y - 1, z, block)].shadow,
+				blockData[getBlock(x, y - 1, z, block)].shadow,
+				blockData[getBlock(x + 1, y - 1, z, block)].shadow,
+				blockData[getBlock(x - 1, y - 1, z + 1, block)].shadow,
+				blockData[getBlock(x, y - 1, z + 1, block)].shadow,
+				blockData[getBlock(x + 1, y - 1, z + 1, block)].shadow,
+			];
+			return [
+				this.shade[blocks[0] + blocks[1] + blocks[3] + blocks[4]] * 0.8,
+				this.shade[blocks[1] + blocks[2] + blocks[4] + blocks[5]] * 0.8,
+				this.shade[blocks[5] + blocks[4] + blocks[8] + blocks[7]] * 0.8,
+				this.shade[blocks[4] + blocks[3] + blocks[7] + blocks[6]] * 0.8,
+			];
+		},
+		bottom: function(x, y, z, block) {
+			let blocks = [
+				blockData[getBlock(x - 1, y + 1, z - 1, block)].shadow,
+				blockData[getBlock(x, y + 1, z - 1, block)].shadow,
+				blockData[getBlock(x + 1, y + 1, z - 1, block)].shadow,
+				blockData[getBlock(x - 1, y + 1, z, block)].shadow,
+				blockData[getBlock(x, y + 1, z, block)].shadow,
+				blockData[getBlock(x + 1, y + 1, z, block)].shadow,
+				blockData[getBlock(x - 1, y + 1, z + 1, block)].shadow,
+				blockData[getBlock(x, y + 1, z + 1, block)].shadow,
+				blockData[getBlock(x + 1, y + 1, z + 1, block)].shadow,
+			];
+			return [
+				this.shade[blocks[0] + blocks[1] + blocks[3] + blocks[4]],
+				this.shade[blocks[4] + blocks[3] + blocks[7] + blocks[6]],
+				this.shade[blocks[5] + blocks[4] + blocks[8] + blocks[7]],
+				this.shade[blocks[1] + blocks[2] + blocks[4] + blocks[5]],
+			];
+		},
+		north: function(x, y, z, block) {
+			let blocks = [
+				blockData[getBlock(x - 1, y - 1, z + 1, block)].shadow,
+				blockData[getBlock(x, y - 1, z + 1, block)].shadow,
+				blockData[getBlock(x + 1, y - 1, z + 1, block)].shadow,
+				blockData[getBlock(x - 1, y, z + 1, block)].shadow,
+				blockData[getBlock(x, y, z + 1, block)].shadow,
+				blockData[getBlock(x + 1, y, z + 1, block)].shadow,
+				blockData[getBlock(x - 1, y + 1, z + 1, block)].shadow,
+				blockData[getBlock(x, y + 1, z + 1, block)].shadow,
+				blockData[getBlock(x + 1, y + 1, z + 1, block)].shadow,
+			];
+			return [
+				this.shade[blocks[5] + blocks[4] + blocks[8] + blocks[7]],
+				this.shade[blocks[4] + blocks[3] + blocks[7] + blocks[6]],
+				this.shade[blocks[0] + blocks[1] + blocks[3] + blocks[4]],
+				this.shade[blocks[1] + blocks[2] + blocks[4] + blocks[5]],
+			];
+		},
+		south: function(x, y, z, block) {
+			let blocks = [
+				blockData[getBlock(x - 1, y - 1, z - 1, block)].shadow,
+				blockData[getBlock(x - 1, y, z - 1, block)].shadow,
+				blockData[getBlock(x - 1, y + 1, z - 1, block)].shadow,
+				blockData[getBlock(x, y - 1, z - 1, block)].shadow,
+				blockData[getBlock(x, y, z - 1, block)].shadow,
+				blockData[getBlock(x, y + 1, z - 1, block)].shadow,
+				blockData[getBlock(x + 1, y - 1, z - 1, block)].shadow,
+				blockData[getBlock(x + 1, y, z - 1, block)].shadow,
+				blockData[getBlock(x + 1, y + 1, z - 1, block)].shadow,
+			];
+			return [
+				this.shade[blocks[1] + blocks[2] + blocks[4] + blocks[5]],
+				this.shade[blocks[5] + blocks[4] + blocks[8] + blocks[7]],
+				this.shade[blocks[4] + blocks[3] + blocks[7] + blocks[6]],
+				this.shade[blocks[0] + blocks[1] + blocks[3] + blocks[4]],
+			];
+		},
+		east: function(x, y, z, block) {
+			let blocks = [
+				blockData[getBlock(x + 1, y - 1, z - 1, block)].shadow,
+				blockData[getBlock(x + 1, y, z - 1, block)].shadow,
+				blockData[getBlock(x + 1, y + 1, z - 1, block)].shadow,
+				blockData[getBlock(x + 1, y - 1, z, block)].shadow,
+				blockData[getBlock(x + 1, y, z, block)].shadow,
+				blockData[getBlock(x + 1, y + 1, z, block)].shadow,
+				blockData[getBlock(x + 1, y - 1, z + 1, block)].shadow,
+				blockData[getBlock(x + 1, y, z + 1, block)].shadow,
+				blockData[getBlock(x + 1, y + 1, z + 1, block)].shadow,
+			];
+			return [
+				this.shade[blocks[1] + blocks[2] + blocks[4] + blocks[5]] * 0.8,
+				this.shade[blocks[5] + blocks[4] + blocks[8] + blocks[7]] * 0.8,
+				this.shade[blocks[4] + blocks[3] + blocks[7] + blocks[6]] * 0.8,
+				this.shade[blocks[0] + blocks[1] + blocks[3] + blocks[4]] * 0.8,
+			];
+		},
+		west: function(x, y, z, block) {
+			let blocks = [
+				blockData[getBlock(x - 1, y - 1, z - 1, block)].shadow,
+				blockData[getBlock(x - 1, y, z - 1, block)].shadow,
+				blockData[getBlock(x - 1, y + 1, z - 1, block)].shadow,
+				blockData[getBlock(x - 1, y - 1, z, block)].shadow,
+				blockData[getBlock(x - 1, y, z, block)].shadow,
+				blockData[getBlock(x - 1, y + 1, z, block)].shadow,
+				blockData[getBlock(x - 1, y - 1, z + 1, block)].shadow,
+				blockData[getBlock(x - 1, y, z + 1, block)].shadow,
+				blockData[getBlock(x - 1, y + 1, z + 1, block)].shadow,
+			];
+			return [
+				this.shade[blocks[7] + blocks[8] + blocks[4] + blocks[5]] * 0.8,
+				this.shade[blocks[5] + blocks[4] + blocks[2] + blocks[1]] * 0.8,
+				this.shade[blocks[4] + blocks[3] + blocks[1] + blocks[0]] * 0.8,
+				this.shade[blocks[6] + blocks[7] + blocks[3] + blocks[4]] * 0.8,
+			];
+		},
+	};
+	/** Section Class **/
+	function Section(x, y, z, size, chunk) {
+		this.x = x;
+		this.y = y;
+		this.z = z;
+		this.size = size;
+		this.arraySize = size * size * size;
+		this.blocks = newInt32Array(this.arraySize);
+		this.renderData = [];
+		this.renderLength = 0;
+		this.faces = 0;
+		this.hasVisibleBlocks = false;
+		this.chunk = chunk;
+		this.edited = false;
+		this.caves = false;
+	}
+	Section.prototype.getBlock = function(x, y, z) {
+		let s = this.size;
+		return this.blocks[x * s * s + y * s + z] & 0xff;
+	};
+	Section.prototype.setBlock = function(x, y, z, blockID, hidden) {
+		let s = this.size;
+		this.blocks[x * s * s + y * s + z] = !hidden << 31 | blockID;
+	};
+	Section.prototype.deleteBlock = function(x, y, z) {
+		let s = this.size;
+		let data = this.blocks[x * s * s + y * s + z];
+		let index = this.renderData.indexOf(data);
+		if (index >= 0 && index < this.renderLength) {
+			this.renderData.splice(index, 1);
+			this.renderLength--;
+			this.hasVisibleBlocks = !!this.renderLength;
+			if (!world.meshQueue.includes(this.chunk)) {
+				world.meshQueue.push(this.chunk);
+			}
+		}
+		this.blocks[x * s * s + y * s + z] = blockIds.air;
+	};
+	Section.prototype.optimize = function(world) {
+		let visible = false;
+		let pos = 0;
+		let xx = this.x;
+		let yy = this.y;
+		let zz = this.z;
+		let blockData = 0;
+		let blockType = 0;
+		let index = 0;
+		let s = this.size;
+		let blocks = this.blocks;
+		this.hasVisibleBlocks = false;
+		this.renderLength = 0;
+		let localBlocks = world.getAdjacentSubchunks(xx, yy, zz);
+		//Check all the blocks in the subchunk to see if they're visible.
+		for (let i = 0; i < s; i++) {
+			for (let j = 0; j < s; j++) {
+				for (let k = 0; k < s; k++, index++) {
+					blockData = blocks[index];
+					if (blockData >= 0) {
+						continue;
+					}
+					blockType = blockData & 0xff;
+					// x = i + xx;
+					// y = j + yy;
+					// z = k + zz;
+					visible = hideFace(i - 1, j, k, localBlocks, blockType, getBlock2) | hideFace(i + 1, j, k, localBlocks, blockType, getBlock2) << 1 | hideFace(i, j - 1, k, localBlocks, blockType, getBlock2) << 2 | hideFace(i, j + 1, k, localBlocks, blockType, getBlock2) << 3 | hideFace(i, j, k - 1, localBlocks, blockType, getBlock2) << 4 | hideFace(i, j, k + 1, localBlocks, blockType, getBlock2) << 5;
+					if (visible) {
+						pos = (i | j << 4 | k << 8) << 16;
+						blockData = 1 << 31 | pos | visible << 8 | blockType;
+						this.renderData[this.renderLength++] = blockData;
+						blocks[index] = blockData;
+						this.hasVisibleBlocks = true;
+					} else {
+						blocks[index] = blockType;
+					}
+				}
+			}
+		}
+	};
+	Section.prototype.updateBlock = function(x, y, z, world) {
+		let i = x;
+		let j = y;
+		let k = z;
+		let s = this.size;
+		x += this.x;
+		y += this.y;
+		z += this.z;
+		let blockData = this.blocks[i * s * s + j * s + k];
+		let blockType = blockData & 0xff;
+		let visible = blockType && hideFace(x - 1, y, z, 0, blockType, world.getBlock) | hideFace(x + 1, y, z, 0, blockType, world.getBlock) << 1 | hideFace(x, y - 1, z, 0, blockType, world.getBlock) << 2 | hideFace(x, y + 1, z, 0, blockType, world.getBlock) << 3 | hideFace(x, y, z - 1, 0, blockType, world.getBlock) << 4 | hideFace(x, y, z + 1, 0, blockType, world.getBlock) << 5;
+		let pos = (i | j << 4 | k << 8) << 16;
+		let index = blockData < 0 ? this.renderData.indexOf(blockData) : -1;
+		if ((index < 0 || index >= this.renderLength) && !visible) {
+			if (!world.meshQueue.includes(this.chunk)) {
+				world.meshQueue.push(this.chunk);
+			}
+			return;
+		}
+		if (!visible) {
+			this.renderData.splice(index, 1);
+			this.blocks[i * s * s + j * s + k] = blockType; //Toggle invisible bit
+			this.renderLength--;
+			this.hasVisibleBlocks = !!this.renderLength;
+			if (!world.meshQueue.includes(this.chunk)) {
+				world.meshQueue.push(this.chunk);
+			}
+			this.chunk.minY = y < this.chunk.minY ? y : this.chunk.minY;
+			this.chunk.maxY = y > this.chunk.maxY ? y : this.chunk.maxY;
+			return;
+		}
+		if (visible && (index < 0 || index >= this.renderLength)) {
+			index = this.renderLength++;
+			this.hasVisibleBlocks = true;
+		}
+		this.chunk.minY = y < this.chunk.minY ? y : this.chunk.minY;
+		this.chunk.maxY = y > this.chunk.maxY ? y : this.chunk.maxY;
+		this.renderData[index] = 1 << 31 | pos | visible << 8 | blockData & 0xff;
+		this.blocks[i * s * s + j * s + k] = this.renderData[index];
+		if (!world.meshQueue.includes(this.chunk)) {
+			world.meshQueue.push(this.chunk);
+		}
+	};
+	Section.prototype.genMesh = function(barray, index) {
+		if (!this.renderLength) {
+			return index;
+		}
+		let length = this.renderLength;
+		let rData = this.renderData;
+		let x = 0,
+			y = 0,
+			z = 0,
+			loc = 0,
+			data = 0,
+			sides = 0,
+			tex = null,
+			x2 = 0,
+			y2 = 0,
+			z2 = 0,
+			verts = null,
+			texVerts = null,
+			texShapeVerts = null,
+			tx = 0,
+			ty = 0;
+		let wx = this.x,
+			wy = this.y,
+			wz = this.z;
+		let blocks = world.getAdjacentSubchunks(wx, wy, wz);
+		let shadows = null;
+		let blockSides = Object.keys(Block);
+		let side = "";
+		let shapeVerts = null;
+		let shapeTexVerts = null;
+		for (let i = 0; i < length; i++) {
+			data = rData[i];
+			tex = blockData[data & 127].textures;
+			sides = data >> 8 & 0x3f;
+			loc = data >> 16;
+			x = loc & 15;
+			y = loc >> 4 & 15;
+			z = loc >> 8 & 15;
+			x2 = x + this.x;
+			y2 = y + this.y;
+			z2 = z + this.z;
+			if (data & 128) {
+				shapeVerts = shapes.slab.verts;
+				shapeTexVerts = shapes.slab.texVerts;
+			} else {
+				shapeVerts = shapes.cube.verts;
+				shapeTexVerts = shapes.cube.texVerts;
+			}
+			let texNum = 0;
+			for (let n = 0; n < 6; n++) {
+				side = blockSides[n];
+				if (sides & Block[side]) {
+					shadows = getShadows[side](x, y, z, blocks);
+					verts = shapeVerts[Sides[side]][0];
+					texVerts = textureCoords[textureMap[tex[texNum]]];
+					tx = texVerts[2];
+					ty = texVerts[3];
+					texShapeVerts = shapeTexVerts[n][0];
+					barray[index] = verts[0] + x2;
+					barray[index + 1] = verts[1] + y2;
+					barray[index + 2] = verts[2] + z2;
+					barray[index + 3] = tx + texShapeVerts[0];
+					barray[index + 4] = ty + texShapeVerts[1];
+					barray[index + 5] = shadows[0];
+					barray[index + 6] = verts[3] + x2;
+					barray[index + 7] = verts[4] + y2;
+					barray[index + 8] = verts[5] + z2;
+					barray[index + 9] = tx + texShapeVerts[2];
+					barray[index + 10] = ty + texShapeVerts[3];
+					barray[index + 11] = shadows[1];
+					barray[index + 12] = verts[6] + x2;
+					barray[index + 13] = verts[7] + y2;
+					barray[index + 14] = verts[8] + z2;
+					barray[index + 15] = tx + texShapeVerts[4];
+					barray[index + 16] = ty + texShapeVerts[5];
+					barray[index + 17] = shadows[2];
+					barray[index + 18] = verts[9] + x2;
+					barray[index + 19] = verts[10] + y2;
+					barray[index + 20] = verts[11] + z2;
+					barray[index + 21] = tx + texShapeVerts[6];
+					barray[index + 22] = ty + texShapeVerts[7];
+					barray[index + 23] = shadows[3];
+					index += 24;
+				}
+				texNum++;
+			}
+		}
+		return index;
+	};
+	Section.prototype.carveCaves = function() {
+		let wx = this.x + 16,
+			wz = this.z + 16,
+			wy = this.y + 16;
+		for (let x = this.x, xx = 0; x < wx; x++, xx++) {
+			for (let z = this.z, zz = 0; z < wz; z++, zz++) {
+				wy = this.chunk.tops[zz * 16 + xx];
+				for (let y = this.y; y < wy; y++) {
+					if (isCave(x, y, z)) {
+						carveSphere(x, y, z);
+					}
+				}
+			}
+		}
+		this.caves = true;
+	}
+	Section.prototype.tick = function() {
+		
+	};
+
+	function newSection(x, y, z, size, chunk) {
+		let section = Object.create(Section.prototype);
+		Section.apply(section, [x, y, z, size, chunk]);
+		return section;
+	}
+	let emptySection = newSection(0, 0, 0, 16);
+	let fullSection = newSection(0, 0, 0, 16);
+	fullSection.blocks.fill(blockIds.bedrock);
+	/** Chunk Class **/
+	function Chunk(x, z) {
+		this.x = x;
+		this.z = z;
+		this.maxY = 0;
+		this.minY = 255;
+		this.sections = [];
+		this.cleanSections = [];
+		this.tops = new Uint8Array(16 * 16); // Store the heighest block at every (x,z) coordinate
+		this.optimized = false;
+		this.generated = false; //Terrain
+		this.populated = superflat; //Trees
+		this.lazy = false;
+		this.edited = false;
+		this.caves = superflat;
+	}
+	Chunk.prototype.getBlock = function(x, y, z) {
+		let s = y >> 4;
+		return this.sections.length > s ? this.sections[s].getBlock(x, y & 15, z) : 0;
+	};
+	Chunk.prototype.setBlock = function(x, y, z, blockID, hidden, user) {
+		if (!this.sections[y >> 4]) {
+			do {
+				this.sections.push(newSection(this.x, this.sections.length * 16, this.z, 16, this));
+			} while (!this.sections[y >> 4]);
+		}
+		if (user && !this.sections[y >> 4].edited) {
+			this.cleanSections[y >> 4] = this.sections[y >> 4].blocks.slice();
+			this.sections[y >> 4].edited = true;
+			this.edited = true;
+		}
+		this.sections[y >> 4].setBlock(x, y & 15, z, blockID, hidden);
+	};
+	Chunk.prototype.optimize = function(world) {
+		for (let i = 0; i < this.sections.length; i++) {
+			this.sections[i].optimize(world);
+		}
+		if (!world.meshQueue.includes(this)) {
+			world.meshQueue.push(this);
+		}
+		this.optimized = true;
+	};
+	Chunk.prototype.render = function() {
+		if (!this.buffer) {
+			return;
+		}
+		if (chunkVisible(this.x, this.minY, this.z, this.maxY)) {
+			renderedChunks++;
+			gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+			gl.vertexAttribPointer(glCache.locations.aVertex, 3, gl.FLOAT, false, 24, 0);
+			gl.vertexAttribPointer(glCache.locations.aTexture, 2, gl.FLOAT, false, 24, 12);
+			gl.vertexAttribPointer(glCache.locations.aShadow, 1, gl.FLOAT, false, 24, 20);
+			gl.drawElements(gl.TRIANGLES, 6 * this.faces, gl.UNSIGNED_INT, 0);
+		}
+	};
+	Chunk.prototype.updateBlock = function(x, y, z, world, lazy) {
+		if (this.buffer) {
+			this.lazy = lazy;
+			if (this.sections.length > y >> 4) {
+				this.sections[y >> 4].updateBlock(x, y & 15, z, world);
+			}
+		}
+	};
+	Chunk.prototype.deleteBlock = function(x, y, z, user) {
+		if (!this.sections[y >> 4]) {
+			return;
+		}
+		if (user && !this.sections[y >> 4].edited) {
+			this.cleanSections[y >> 4] = this.sections[y >> 4].blocks.slice();
+			this.sections[y >> 4].edited = true;
+			this.edited = true;
+		}
+		this.sections[y >> 4].deleteBlock(x, y & 15, z);
+		this.minY = y < this.minY ? y : this.minY;
+		this.maxY = y > this.maxY ? y : this.maxY;
+		// if (y === this.tops[z * 16 + x]) {
+		// 	while(--y && !this.getBlock(x, y, z)) {}
+		// 	this.tops[z * 16 + x] = y;
+		// }
+	};
+	Chunk.prototype.carveCaves = function() {
+		for (let i = 0; i < this.sections.length; i++) {
+			if (!this.sections[i].caves) {
+				this.sections[i].carveCaves();
+				if (i + 1 >= this.sections.length) {
+					this.caves = true;
+				}
+				return;
+			}
+		}
+	};
+	Chunk.prototype.genMesh = function() {
+		let start = win.performance.now();
+		let barray = bigArray;
+		let index = 0;
+		let g = gl;
+		for (let i = 0; i < this.sections.length; i++) {
+			index = this.sections[i].genMesh(barray, index);
+		}
+		let arrayDone = win.performance.now();
+		if (!this.buffer) {
+			this.buffer = g.createBuffer();
+		}
+		let data = barray.slice(0, index);
+		let maxY = 0;
+		let minY = 255;
+		let y = 0;
+		for (let i = 1; i < data.length; i += 6) {
+			y = data[i]
+			maxY = Math.max(maxY, y);
+			minY = Math.min(minY, y);
+		}
+		this.maxY = maxY;
+		this.minY = minY;
+		this.faces = data.length / 24;
+		g.bindBuffer(g.ARRAY_BUFFER, this.buffer);
+		g.bufferData(g.ARRAY_BUFFER, data, g.DYNAMIC_DRAW);
+		this.lazy = false;
+	};
+	Chunk.prototype.tick = function() {
+		if (this.edited) {
+			for (let i = 0; i < this.sections.length; i++) {
+				if (this.sections[i].edited) {
+					this.sections[i].tick();
+				}
+			}
+		}
+	};
+	Chunk.prototype.load = function() {
+		let chunkX = this.x >> 4;
+		let chunkZ = this.z >> 4;
+		let load = null;
+		for (let i = 0; i < world.loadFrom.length; i++) {
+			load = world.loadFrom[i];
+			if (load.x === chunkX && load.z === chunkZ) {
+				let y = load.y * 16;
+				for (let j in load.blocks) {
+					world.setBlock((j >> 8 & 15) + this.x, (j >> 4 & 15) + y, (j & 15) + this.z, load.blocks[j]);
+				}
+				world.loadFrom.splice(i--, 1);
+			}
+		}
+	}
+
+	function newChunk(x, z) {
+		let chunk = Object.create(Chunk.prototype);
+		Chunk.call(chunk, x, z);
+		return chunk;
+	}
+	let analytics = {
+		totalTickTime: 0,
+		worstFrameTime: 0,
+		totalRenderTime: 0,
+		totalFrameTime: 0,
+		lastUpdate: 0,
+		frames: 1,
+		displayedTickTime: "0",
+		displayedRenderTime: "0",
+		displayedFrameTime: "0",
+		displayedwFrameTime: 0,
+		fps: 0,
+	};
+
+	function sortChunks(c1, c2) { //Sort the list of chunks based on distance from the player
+		let dx1 = p.x - c1.x - 8;
+		let dy1 = p.z - c1.z - 8;
+		let dx2 = p.x - c2.x - 8;
+		let dy2 = p.z - c2.z - 8;
+		return dx1 * dx1 + dy1 * dy1 - (dx2 * dx2 + dy2 * dy2);
+	}
+
+	function fillReqs(x, z) {
+		// Chunks must all be loaded first.
+		var done = true;
+		for (let i = x - 2; i <= x + 2; i++) {
+			for (let j = z - 2; j <= z + 2; j++) {
+				let chunk = world.loaded[(i + world.offsetX) * world.lwidth + j + world.offsetZ]
+				if (!chunk.generated) {
+					world.generateQueue.push(chunk);
+					done = false;
+				}
+				if (!chunk.populated && i >= x - 1 && i <= x + 1 && j >= z - 1 && j <= z + 1) {
+					world.populateQueue.push(chunk);
+					done = false;
+				}
+			}
+		}
+		return done;
+	}
+
+	function maxDist(x, z, x2, z2) {
+		let ax = Math.abs(x2 - x);
+		let az = Math.abs(z2 - z);
+		return Math.max(ax, az);
+	}
+
+	function renderFilter(chunk) {
+		return maxDist(chunk.x >> 4, chunk.z >> 4, p.cx, p.cz) <= renderDistance;
+	}
+
+	function debug(message) {
+		let ellapsed = performance.now() - debug.start;
+		if (ellapsed > 30) {
+			console.log(message, ellapsed.toFixed(2), "milliseconds");
+		}
+	}
+	/** World Class **/
+	//{
+	let genChunk = function(chunk) {
+		let x = chunk.x >> 4;
+		let z = chunk.z >> 4;
+		let trueX = chunk.x;
+		let trueZ = chunk.z;
+		if (chunk.generated) {
+			return false;
+		}
+		let hide = !loadString;
+		let smoothness = generator.smooth;
+		let hilliness = generator.height;
+		let gen = 0;
+		for (let i = 0; i < 16; i++) {
+			for (let k = 0; k < 16; k++) {
+				gen = 4;
+				chunk.tops[k * 16 + i] = gen;
+				chunk.setBlock(i, gen, k, blockIds.grass);
+				chunk.setBlock(i, gen - 1, k, blockIds.dirt);
+				chunk.setBlock(i, gen - 2, k, blockIds.dirt);
+				chunk.setBlock(i, gen - 3, k, blockIds.dirt);
+				for (let j = 1; j < gen - 3; j++) {
+					chunk.setBlock(i, j, k, blockIds.stone);
+				}
+				chunk.setBlock(i, 0, k, blockIds.bedrock);
+			}
+		}
+		chunk.generated = true;
+		generatedChunks++;
+	};
+	let getAdjacentSubchunks = function(x, y, z) {
+		let minChunkX = x - 16 >> 4;
+		let maxChunkX = x + 16 >> 4;
+		let minChunkY = y - 16 >> 4;
+		let maxChunkY = y + 16 >> 4;
+		let minChunkZ = z - 16 >> 4;
+		let maxChunkZ = z + 16 >> 4;
+		let ret = [];
+		for (x = minChunkX; x <= maxChunkX; x++) {
+			for (let y = minChunkY; y <= maxChunkY; y++) {
+				for (z = minChunkZ; z <= maxChunkZ; z++) {
+					if (y < 0) {
+						ret.push(fullSection.blocks);
+					} else if (this.chunks[x] && this.chunks[x][z]) {
+						ret.push((this.chunks[x][z].sections[y] || emptySection).blocks);
+					} else {
+						ret.push(emptySection.blocks);
+					}
+				}
+			}
+		}
+		return ret;
+	};
+	let updateBlock = function(x, y, z, lazy) {
+		let chunk = this.chunks[x >> 4] && this.chunks[x >> 4][z >> 4];
+		if (chunk && chunk.buffer) {
+			chunk.updateBlock(x & 15, y, z & 15, this, lazy);
+		}
+	};
+	let getWorldBlock = function(x, y, z) {
+		if (!this.chunks[x >> 4] || !this.chunks[x >> 4][z >> 4]) {
+			return blockIds.air;
+		}
+		return this.chunks[x >> 4][z >> 4].getBlock(x & 15, y, z & 15);
+	};
+	let getLoadedBlock = function(x, y, z) {
+		let X = (x >> 4) + this.offsetX;
+		let Z = (z >> 4) + this.offsetZ;
+		if (y > maxHeight) {
+			return blockIds.air;
+		} else if (y < 0) {
+			return blockIds.bedrock;
+		} else if (X < 0 || X >= this.lwidth || Z < 0 || Z >= this.lwidth) {
+			return this.getWorldBlock(x, y, z);
+		}
+		return this.loaded[X * this.lwidth + Z].getBlock(x & 15, y, z & 15);
+	};
+	let setBlock = function(x, y, z, blockID, lazy) {
+		if (!this.chunks[x >> 4] || !this.chunks[x >> 4][z >> 4]) {
+			return;
+		}
+		let chunk = this.chunks[x >> 4][z >> 4];
+		let xm = x & 15;
+		let zm = z & 15;
+		if (blockID) {
+			chunk.setBlock(xm, y, zm, blockID, false, !lazy);
+		} else {
+			chunk.deleteBlock(xm, y, zm, !lazy);
+		}
+		//Update the 6 adjacent blocks and 1 changed block
+		if (xm && xm !== 15 && zm && zm !== 15) {
+			chunk.updateBlock(xm - 1, y, zm, this, lazy);
+			chunk.updateBlock(xm + 1, y, zm, this, lazy);
+			chunk.updateBlock(xm, y - 1, zm, this, lazy);
+			chunk.updateBlock(xm, y + 1, zm, this, lazy);
+			chunk.updateBlock(xm, y, zm - 1, this, lazy);
+			chunk.updateBlock(xm, y, zm + 1, this, lazy);
+		} else {
+			this.updateBlock(x - 1, y, z, lazy);
+			this.updateBlock(x + 1, y, z, lazy);
+			this.updateBlock(x, y - 1, z, lazy);
+			this.updateBlock(x, y + 1, z, lazy);
+			this.updateBlock(x, y, z - 1, lazy);
+			this.updateBlock(x, y, z + 1, lazy);
+		}
+		chunk.updateBlock(xm, y, zm, this, lazy);
+		//Update the corner chunks so shadows in adjacent chunks update correctly
+		if (xm | zm === 0) {
+			this.updateBlock(x - 1, y, z - 1, lazy);
+		}
+		if (xm === 15 && zm === 0) {
+			this.updateBlock(x + 1, y, z - 1, lazy);
+		}
+		if (xm === 0 && zm === 15) {
+			this.updateBlock(x - 1, y, z + 1, lazy);
+		}
+		if (xm & zm === 15) {
+			this.updateBlock(x + 1, y, z + 1, lazy);
+		}
+	};
+	let spawnBlock = function(x, y, z, blockID) {
+		//Sets a block anywhere without causing block updates around it. Only to be used in world gen.
+		let chunkX = x >> 4;
+		let chunkZ = z >> 4;
+		if (!this.chunks[chunkX]) {
+			this.chunks[chunkX] = [];
+		}
+		let chunk = this.chunks[chunkX][chunkZ];
+		if (!chunk) {
+			chunk = newChunk(chunkX * 16, chunkZ * 16);
+			this.chunks[chunkX][chunkZ] = chunk;
+		}
+		if (chunk.buffer) {
+			//Only used if spawning a block post-gen
+			this.setBlock(x, y, z, blockID, true);
+		} else if (!chunk.getBlock(x & 15, y, z & 15)) {
+			chunk.setBlock(x & 15, y, z & 15, blockID, false);
+		}
+	};
+	let tick = function() {
+		let tickStart = win.performance.now();
+		let maxChunkX = (p.x >> 4) + renderDistance;
+		let maxChunkZ = (p.z >> 4) + renderDistance;
+		let chunk = maxChunkX + "," + maxChunkZ;
+		if (chunk !== this.lastChunk) {
+			this.lastChunk = chunk;
+			this.loadChunks();
+			this.chunkGenQueue.sort(sortChunks);
+		}
+		if (Key.leftMouse && !Key.control && p.lastBreak < Date.now() - 250) {
+			changeWorldBlock(0);
+		}
+		if ((Key.rightMouse || Key.leftMouse && Key.control) && p.lastPlace < Date.now() - 250) {
+			newWorldBlock();
+		}
+		if (Key.leftMouse && p.autoBreak && !Key.control) {
+			changeWorldBlock(0);
+		}
+		for (let i = 0; i < this.sortedChunks.length; i++) {
+			this.sortedChunks[i].tick();
+		}
+		do {
+			let doneWork = false;
+			debug.start = performance.now();
+			if (this.meshQueue.length) {
+				// Update all chunk meshes.
+				let len = this.meshQueue.length - 1;
+				do {
+					this.meshQueue.pop().genMesh();
+				} while (this.meshQueue.length);
+				doneWork = true;
+				debug("Meshes")
+			}
+			if (this.generateQueue.length && !doneWork) {
+				let chunk = this.generateQueue.pop()
+				this.genChunk(chunk);
+				doneWork = true;
+			}
+			if (this.populateQueue.length && !doneWork) {
+				let chunk = this.populateQueue[this.populateQueue.length - 1]
+				if (!chunk.caves) {
+					chunk.carveCaves();
+					debug("Carve caves")
+				} else if (!chunk.populated) {
+					this.populateQueue.pop();
+				}
+				doneWork = true;
+			}
+			if (this.chunkGenQueue.length && !doneWork) {
+				let chunk = this.chunkGenQueue[0];
+				if (!fillReqs(chunk.x >> 4, chunk.z >> 4)) {} else if (!chunk.optimized) {
+					chunk.load();
+					chunk.optimize(this);
+					debug("Optimize")
+				} else if (!chunk.buffer) {
+					chunk.genMesh();
+					debug("Initial mesh")
+				} else {
+					this.chunkGenQueue.shift();
+				}
+				doneWork = true;
+			}
+			if (!doneWork) {
+				break;
+			}
+		} while (win.performance.now() - tickStart < 5);
+	};
+	let render = function() {
+		initModelView(p.x, p.y, p.z, p.rx, p.ry);
+		gl.clear(gl.DEPTH_BUFFER_BIT | gl.COLOR_BUFFER_BIT);
+		p2.x = Math.round(p.x);
+		p2.y = Math.round(p.y);
+		p2.z = Math.round(p.z);
+		renderedChunks = 0;
+		gl.enableVertexAttribArray(glCache.locations.aShadow);
+		
+		var camloc = gl.getUniformLocation(programObject3D, "uCamera");
+		gl.uniform3f(camloc, p.x, p.y, p.z);
+		
+		var camdir = gl.getUniformLocation(programObject3D, "uDirection");
+		gl.uniform3f(camdir, p.direction.x, p.direction.y, p.direction.z);
+		
+		let c = this.sortedChunks;
+		let lx = p.direction.x;
+		let ly = p.direction.y;
+		let lz = p.direction.z;
+		let nlx = lx < 0 ? 0 : 16;
+		let nly = ly < 0;
+		let nlz = lz < 0 ? 0 : 16;
+		let x = p.x;
+		let y = p.y;
+		let z = p.z;
+		let dx = 0,
+			dy = 0,
+			dz = 0;
+		let chunk = null;
+		for (let i = 0, l = c.length; i < l; i++) {
+			chunk = c[i];
+			dx = chunk.x - x + nlx;
+			dy = (nly ? chunk.minY : chunk.maxY) - y;
+			dz = chunk.z - z + nlz;
+			if (dx * lx + dy * ly + dz * lz > 0) {
+				chunk.render();
+			}
+		}
+		if (hitBox.pos) {
+			blockOutlines = true;
+			blockFill = false;
+			block2(hitBox.pos[0], hitBox.pos[1], hitBox.pos[2], 0);
+			blockOutlines = false;
+			blockFill = true;
+		}
+	};
+	let loadChunks = function() {
+		renderDistance += 2;
+		let cx = p.x >> 4;
+		let cz = p.z >> 4;
+		p.cx = cx;
+		p.cz = cz;
+		let minChunkX = cx - renderDistance;
+		let maxChunkX = cx + renderDistance;
+		let minChunkZ = cz - renderDistance;
+		let maxChunkZ = cz + renderDistance;
+		this.offsetX = -minChunkX;
+		this.offsetZ = -minChunkZ;
+		this.lwidth = renderDistance * 2 + 1;
+		this.chunkGenQueue.length = 0;
+		renderDistance -= 2;
+		if (this.loaded.length > this.lwidth * this.lwidth) {
+			this.loaded.length = this.lwidth * this.lwidth;
+		}
+		let i = 0;
+		for (let x = minChunkX; x <= maxChunkX; x++) {
+			for (let z = minChunkZ; z <= maxChunkZ; z++) {
+				let chunk;
+				if (!this.chunks[x]) {
+					this.chunks[x] = [];
+				}
+				if (!this.chunks[x][z]) {
+					chunk = newChunk(x * 16, z * 16);
+					if (maxDist(cx, cz, x, z) <= renderDistance) {
+						this.chunkGenQueue.push(chunk);
+					}
+					this.chunks[x][z] = chunk;
+				}
+				chunk = this.chunks[x][z];
+				if (!chunk.buffer && !this.chunkGenQueue.includes(chunk) && maxDist(cx, cz, x, z) <= renderDistance) {
+					this.chunkGenQueue.push(chunk);
+				}
+				this.loaded[i++] = chunk;
+			}
+		}
+		this.sortedChunks = this.loaded.filter(renderFilter);
+		this.sortedChunks.sort(sortChunks);
+	};
+
+	function getSaveString() {
+		let edited = [];
+		for (let x in this.chunks) {
+			for (let z in this.chunks[x]) {
+				let chunk = this.chunks[x][z];
+				if (chunk.edited) {
+					for (let y = 0; y < chunk.sections.length; y++) {
+						if (chunk.sections[y].edited) {
+							edited.push([chunk.sections[y], chunk.cleanSections[y]]);
+						}
+					}
+				}
+			}
+		}
+		let str = worldSeed.toString(36) + ";" + Math.round(p.x).toString(36) + "," + Math.round(p.y).toString(36) + "," + Math.round(p.z).toString(36) + "," + (p.rx * 100 | 0).toString(36) + "," + (p.ry * 100 | 0).toString(36) + ";" + edited.length.toString(36) + ";";
+		for (let i = 0; i < edited.length; i++) {
+			let sc = edited[i][0];
+			str += (sc.x / 16).toString(36) + ",";
+			str += (sc.y / 16).toString(36) + ",";
+			str += (sc.z / 16).toString(36) + ",";
+		}
+		if (edited.length) str = str.substr(0, str.length - 1); //Remove trailing comma
+		str += ";";
+		for (let i = 0; i < edited.length; i++) {
+			let real = edited[i][0];
+			let blocks = real.blocks;
+			let original = edited[i][1];
+			let hasBlocks = false;
+			for (let j = 0; j < original.length; j++) {
+				if ((blocks[j] & 0xff) !== (original[j] & 0xff)) {
+					str += (j << 8 | blocks[j] & 0xff).toString(36) + ",";
+					hasBlocks = true;
+				}
+			}
+			if (hasBlocks) str = str.substr(0, str.length - 1); //Remove trailing comma
+			str += ";";
+		}
+		str = str.substr(0, str.length - 1);
+		return str;
+	}
+
+	function loadSave(str) {
+		let data = str.split(";");
+		worldSeed = parseInt(data.shift(), 36);
+		seedHash(worldSeed);
+		let playerData = data.shift().split(",");
+		p.x = parseInt(playerData[0], 36);
+		p.y = parseInt(playerData[1], 36);
+		p.z = parseInt(playerData[2], 36);
+		p.rx = parseInt(playerData[3], 36) / 100;
+		p.ry = parseInt(playerData[4], 36) / 100;
+		let editCount = parseInt(data.shift(), 36);
+		this.loadFrom = [];
+		let coords = data.shift().split(",").map(function(n) {
+			return parseInt(n, 36);
+		});
+		for (let j = 0; j < coords.length; j += 3) {
+			this.loadFrom.push({
+				x: coords[j],
+				y: coords[j + 1],
+				z: coords[j + 2],
+				blocks: [],
+			})
+		}
+		for (let i = 0; data.length > 0; i++) {
+			let blocks = data.shift().split(",");
+			for (let j = 0; j < blocks.length; j++) {
+				let block = parseInt(blocks[j], 36);
+				let index = block >> 8;
+				let id = block & 0xff;
+				this.loadFrom[i].blocks[index] = id;
+			}
+		}
+	}
+	//}
+	function World() {
+		generatedChunks = 0;
+		p.y = 6;
+		//Initialize the world's arrays
+		return {
+			chunks: [],
+			loaded: [],
+			sortedChunks: [],
+			offsetX: 0,
+			offsetZ: 0,
+			lwidth: 0,
+			chunkGenQueue: [],
+			populateQueue: [],
+			generateQueue: [],
+			meshQueue: [],
+			loadFrom: [],
+			lastChunk: ",",
+			genChunk: genChunk,
+			getAdjacentSubchunks: getAdjacentSubchunks,
+			updateBlock: updateBlock,
+			getBlock: getLoadedBlock,
+			getWorldBlock: getWorldBlock,
+			setBlock: setBlock,
+			spawnBlock: spawnBlock,
+			tick: tick,
+			render: render,
+			loadChunks: loadChunks,
+			getSaveString: getSaveString,
+			loadSave: loadSave,
+		};
+	}
+	let defineWorld = function() {
+		let tickStart = win.performance.now();
+		world.tick();
+		analytics.totalTickTime += win.performance.now() - tickStart;
+		let renderStart = win.performance.now();
+		world.render();
+		analytics.totalRenderTime += win.performance.now() - renderStart;
+	};
+	let controls = function() {
+		if (!speedrunClock.running) {
+			speedrunClock.startClock();
+		}
+		move.x = 0;
+		move.z = 0;
+		let dt = (win.performance.now() - p.lastUpdate) / 33;
+		dt = dt > 2 ? 2 : dt;
+		if (Key.w) {
+			move.z += p.speed;
+		}
+		if (Key.s) {
+			move.z -= p.speed;
+		}
+		if (Key.a) {
+			move.x += p.speed;
+		}
+		if (Key.d) {
+			move.x -= p.speed;
+		}
+		if (Key.arrowleft) {
+			p.ry -= 0.1 * dt;
+		}
+		if (Key.arrowright) {
+			p.ry += 0.1 * dt;
+		}
+		if (Key.arrowup) {
+			p.rx += 0.1 * dt;
+		}
+		if (Key.arrowdown) {
+			p.rx -= 0.1 * dt;
+		}
+		if (Key.q && !p.sneaking) {
+			p.sprinting = true;
+		}
+		if (p.sprinting) {
+			move.x *= p.sprintSpeed;
+			move.z *= p.sprintSpeed;
+		}
+		if (!move.x && !move.z) {
+			p.sprinting = false;
+		} else if (Math.abs(move.x) > 0 && Math.abs(move.z) > 0) {
+			
+			move.x *= move.ang;
+			move.z *= move.ang;
+		}
+		//Update the velocity, rather than the position.
+		let co = Math.cos(p.ry);
+		let si = Math.sin(p.ry);
+		let friction = p.onGround ? 1 : 0.3;
+		p.velocity.x += (co * move.x - si * move.z) * friction * dt;
+		p.velocity.z += (si * move.x + co * move.z) * friction * dt;
+		while (p.ry > Math.PI * 2) {
+			p.ry -= Math.PI * 2;
+		}
+		while (p.ry < 0) {
+			p.ry += Math.PI * 2;
+		}
+		if (p.rx > Math.PI / 2) {
+			p.rx = Math.PI / 2;
+		}
+		if (p.rx < -Math.PI / 2) {
+			p.rx = -Math.PI / 2;
+		}
+		p.direction.set(-si * Math.cos(p.rx), Math.sin(p.rx), co * Math.cos(p.rx));
+		computeFrustum();
+		
+		
+		// Determine the block underneath the player
+		// if it's grass, teleport to latest respawn point
+		// if it's emerald, set respawn point
+		// if it's diamond block, run win screen
+		let chunkX = Math.floor(p.x / 16);
+		let chunkY = Math.floor(p.z / 16);
+		
+		let localPositionX = Math.floor(p.x+.5 - chunkX * 16);
+		let localPositionY = Math.floor(p.y)-2;
+		let localPositionZ = Math.floor(p.z+.5 - chunkY * 16);
+		
+		let theChunk = world.chunks[chunkX][chunkY];
+		let block = theChunk.getBlock(localPositionX, localPositionY, localPositionZ);
+		console.log(block);
+		// 27 = emerald
+		// 40 = orange 
+		// 41 = white
+		// 24 = diamond
+
+		if (block == 1) {
+			p.x = p.lastCheckpointX;
+			p.y = p.lastCheckpointY;
+			p.z = p.lastCheckpointZ;
+			p.velocity.set(0, 0, 0);
+		}
+		
+		if (block == 27) {
+			p.lastCheckpointX = p.x;
+			p.lastCheckpointY = p.y;
+			p.lastCheckpointZ = p.z;
+		}
+		
+		
+		if (block == 24) {
+			speedrunClock.stopClock();
+			speedrunClock.finished = true;
+		}
+	};
+	//Disable scroll
+	(function() {
+		let preventDefault = function(e) {
+			e.preventDefault();
+			if (e.deltaY > 0) {
+				inventory.hotbarSlot++;
+			} else if (e.deltaY < 0) {
+				inventory.hotbarSlot--;
+			}
+			if (inventory.hotbarSlot > 8) {
+				inventory.hotbarSlot = 0;
+			} else if (inventory.hotbarSlot < 0) {
+				inventory.hotbarSlot = 8;
+			}
+			updateHUD = true;
+			holding = inventory.hotbar[inventory.hotbarSlot];
+		};
+		let keys = {
+			32: 1,
+			37: 1,
+			38: 1,
+			39: 1,
+			40: 1
+		};
+
+		function preventDefaultForScrollKeys(e) {
+			if (keys[e.keyCode]) {
+				e.preventDefault();
+				return false;
+			}
+		}
+		// modern Chrome requires { passive: false } when adding event
+		let supportsPassive = false;
+		try {
+			window.addEventListener("test", null, Object.defineProperty({}, 'passive', {
+				get: function() {
+					supportsPassive = true;
+				},
+			}));
+		} catch (e) {}
+		let wheelOpt = supportsPassive ? {
+			passive: false
+		} : false;
+		let wheelEvent = 'onwheel' in document.createElement('div') ? 'wheel' : 'mousewheel';
+		// call this to Disable
+		function disableScroll() {
+			window.addEventListener('DOMMouseScroll', preventDefault, false); // older FF
+			window.addEventListener(wheelEvent, preventDefault, wheelOpt); // modern desktop
+			window.addEventListener('touchmove', preventDefault, wheelOpt); // mobile
+			window.addEventListener('keydown', preventDefaultForScrollKeys, false);
+		}
+		disableScroll();
+	})();
+	// Mouse sensitivity variable, used for the settings buttons and in the "mmoved" function
+	let mouseS = 300;
+	let buttons = [];
+	let button = function(x, y, w, h) {
+		if (mouseX > x && mouseY > y && mouseX < x + w && mouseY < y + h) {
+			return true;
+		} else {
+			return false;
+		}
+	};
+	let addButton = function(x, y, w, h, text, callback, screen) {
+		w = Math.max(w, 300);
+		buttons.push({
+			x: width / 2 - w / 2,
+			y: y,
+			w: w,
+			h: h,
+			text: text,
+			callback: callback,
+			screen: screen,
+		});
+	};
+	let clickButton = function(button) {
+		if (screen === button.screen && mouseX > button.x && mouseY > button.y && mouseX < button.x + button.w && mouseY < button.y + button.h) {
+			button.callback();
+		}
+	};
+	let drawButton = function(button) {
+		if (screen === button.screen) {
+			if (mouseX > button.x && mouseY > button.y && mouseX < button.x + button.w && mouseY < button.y + button.h) {
+				strokeWeight(7);
+			} else {
+				strokeWeight(3);
+			}
+			ctx.strokeStyle = "rgb(30, 30, 30)";
+			ctx.fillStyle = "rgb(120, 120, 120)";
+			ctx.rect(button.x, button.y, button.w, button.h);
+			ctx.stroke();
+			ctx.fill();
+			ctx.beginPath();
+			ctx.textAlign = 'center';
+			ctx.fillStyle = "rgb(80, 80, 80)";
+			ctx.font = "35.5px VT323";
+			ctx.fillText(button.text, button.x + button.w / 2, button.y + button.h / 1.7 + 8);
+			ctx.fillStyle = "rgb(220, 220, 220)";
+			ctx.font = "35px VT323";
+			ctx.fillText(button.text, button.x + button.w / 2, button.y + button.h / 2 + 10);
+		}
+	};
+	var initEverything;
+	addButton(width / 2 - 280, height / 2 - 45, width / 2.5, 50, "Play Parkour", function() {
+		screen = "creation menu";
+	}, "main menu");
+	addButton(width / 2 - 150, height / 2 + 150, width / 5, 40, "Start Speedrun", function() {
+		if (loadString) {
+			savebox.value = loadString;
+		}
+		screen = "loadsave menu";
+		world = World();
+		win.world = world;
+		if (savebox.value) {
+			try {
+				world.loadSave(savebox.value);
+			} catch (e) {
+				alert("Something went wrong!");
+				return;
+			}
+		}
+		world.loadChunks();
+		world.chunkGenQueue.sort(sortChunks);
+		play();
+	}, "creation menu");
+	addButton(width / 2 - 150, height / 2 + 200, width / 5, 40, "Cancel", function() {
+		screen = "main menu";
+	}, "creation menu");
+	addButton(width / 2 - 220, 225, width / 3, 50, "Resume", function() {
+		play();
+	}, "pause");
+
+	function initTextures() {
+		let textureSize = 256;
+		let texturePixels = newUint8Array(textureSize * textureSize * 4);
+		textureMap = {};
+		textureCoords = [];
+		setPixel = function(textureNum, x, y, r, g, b, a) {
+			let texX = textureNum & 15;
+			let texY = textureNum >> 4;
+			let offset = (texY * 16 + y) * 1024 + texX * 64 + x * 4;
+			texturePixels[offset] = r;
+			texturePixels[offset + 1] = g;
+			texturePixels[offset + 2] = b;
+			texturePixels[offset + 3] = a !== undefined ? a : 255;
+		};
+		getPixels = function(str) {
+			// var w = parseInt(str.substr(0, 2), 36);
+			// var h = parseInt(str.substr(2, 2), 36);
+			var colors = [];
+			var pixels = [];
+			var dCount = 0;
+			for (; str[4 + dCount] === "0"; dCount++) {}
+			var ccount = parseInt(str.substr(4 + dCount, dCount + 1), 36);
+			for (var i = 0; i < ccount; i++) {
+				var num = parseInt(str.substr(5 + 2 * dCount + i * 7, 7), 36);
+				colors.push([num >>> 24 & 255, num >>> 16 & 255, num >>> 8 & 255, num & 255]);
+			}
+			for (let i = 5 + 2 * dCount + ccount * 7; i < str.length; i++) {
+				let num = parseInt(str[i], 36);
+				pixels.push(colors[num][0], colors[num][1], colors[num][2], colors[num][3]);
+			}
+			return pixels;
+		};
+		(function() {
+			//Specify the texture coords for each index
+			for (let i = 0; i < 256; i++) {
+				let texX = i & 15;
+				let texY = i >> 4;
+				let offsetX = texX * 0.0625;
+				let offsetY = texY * 0.0625;
+				textureCoords.push(newFloat32Array([0.0625 + offsetX, offsetY, offsetX, offsetY, offsetX, 0.0625 + offsetY, 0.0625 + offsetX, 0.0625 + offsetY]));
+			}
+			//Set all of the textures into 1 big tiled texture
+			let n = 0;
+			for (let i in textures) {
+				if (typeof textures[i] === "function") {
+					textures[i](n);
+				} else if (typeof textures[i] === "string") {
+					let pix = getPixels(textures[i]);
+					for (let j = 0; j < pix.length; j += 4) {
+						setPixel(n, j >> 2 & 15, j >> 6, pix[j], pix[j + 1], pix[j + 2], pix[j + 3]);
+					}
+				}
+				textureMap[i] = n;
+				n++;
+			}
+			//Set the hitbox texture to 1 pixel
+			let arr = newFloat32Array(192)
+			for (let i = 0; i < 192; i += 2) {
+				arr[i] = textureCoords[textureMap.hitbox][2] + 0.01;
+				arr[i + 1] = textureCoords[textureMap.hitbox][1] + 0.01;
+			}
+			textureCoords[textureMap.hitbox] = arr;
+		})();
+		tex = gl.createTexture();
+		gl.bindTexture(gl.TEXTURE_2D, tex);
+		gl.activeTexture(gl.TEXTURE0);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, textureSize, textureSize, 0, gl.RGBA, gl.UNSIGNED_BYTE, texturePixels);
+		gl.generateMipmap(gl.TEXTURE_2D);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+		gl.uniform1i(glCache.locations.uSampler, 0);
+		genIcons();
+	}
+
+	function drawIcon(x, y, id) {
+		if (blockMode === SLAB) {
+			id |= 128;
+		}
+		x = x / (3 * height) - 0.1666 * width / height;
+		y = y / (3 * height) - 0.1666;
+		initModelView(x, y, 0, 0, 0);
+		let buffer = blockIcons[id];
+		gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+		gl.vertexAttribPointer(glCache.locations.aVertex, 3, gl.FLOAT, false, 24, 0);
+		gl.vertexAttribPointer(glCache.locations.aTexture, 2, gl.FLOAT, false, 24, 12);
+		gl.vertexAttribPointer(glCache.locations.aShadow, 1, gl.FLOAT, false, 24, 20);
+		gl.drawElements(gl.TRIANGLES, 6 * 3, gl.UNSIGNED_INT, 0);
+	}
+
+	function hotbar() {}
+
+	function hud() {
+		let s = inventory.size;
+		let x = width / 2 + 0.5;
+		let y = height / 2 + 0.5;
+		// Crosshair
+		ctx.lineWidth = 1;
+		ctx.strokeStyle = "white";
+		ctx.beginPath();
+		ctx.moveTo(x - 10, y);
+		ctx.lineTo(x + 10, y);
+		ctx.moveTo(x, y - 10);
+		ctx.lineTo(x, y + 10);
+		ctx.stroke();
+		//Hotbar
+		let str = speedrunClock.getTime().toFixed(2);
+		ctx.textAlign = 'left';
+		textSize(50);
+		fastText(str, 30, height - 77, 30);
+	}
+
+	function drawInv() {}
+
+	function clickInv() {}
+	let unpauseDelay = 0;
+
+	function mmoved(e) {
+		p.rx -= e.movementY / mouseS;
+		p.ry += e.movementX / mouseS;
+		while (p.ry > Math.PI * 2) {
+			p.ry -= Math.PI * 2;
+		}
+		while (p.ry < 0) {
+			p.ry += Math.PI * 2;
+		}
+		if (p.rx > Math.PI / 2) {
+			p.rx = Math.PI / 2;
+		}
+		if (p.rx < -Math.PI / 2) {
+			p.rx = -Math.PI / 2;
+		}
+	}
+
+	function trackMouse(e) {
+		mouseX = e.x;
+		mouseY = e.y;
+	}
+	document.onmousemove = trackMouse;
+	document.onpointerlockchange = function() {
+		if (doc.pointerLockElement === canvas) {
+			doc.onmousemove = mmoved;
+		} else {
+			doc.onmousemove = trackMouse;
+			if (screen === "play" && !freezeFrame) {
+				//screen = "pause";
+				//unpauseDelay = Date.now() + 1000;
+			}
+		}
+		for (let key in Key) {
+			Key[key] = false;
+		}
+	};
+	canvas.onmousedown = function(e) {
+		mouseX = e.x;
+		mouseY = e.y;
+		switch (e.button) {
+			case 0:
+				Key.leftMouse = true;
+				break;
+			case 1:
+				Key.middleMouse = true;
+				updateHUD = true;
+				inventory.hotbar[inventory.hotbarSlot] = world.getBlock(hitBox.pos[0], hitBox.pos[1], hitBox.pos[2]);
+				break;
+			case 2:
+				Key.rightMouse = true;
+				break;
+		}
+		if (screen === "play") {
+			if (doc.pointerLockElement !== canvas) {
+				getPointer();
+				p.lastBreak = Date.now();
+			} else {
+				place = false;
+				if (e.button === 0) {
+					if (Key.control) {
+						place = true;
+					} else {
+						changeWorldBlock(0);
+					}
+				}
+				holding = inventory.hotbar[inventory.hotbarSlot];
+				if (e.button === 2 && holding) {
+					place = true;
+				}
+				if (place) {
+					newWorldBlock();
+				}
+			}
+		} else if (screen === "inventory") {
+			clickInv();
+		}
+		let currentScreen = screen;
+		for (let i = 0; i < buttons.length; i++) {
+			if (buttons[i].screen === currentScreen) {
+				clickButton(buttons[i]);
+			}
+		}
+	};
+	canvas.onmouseup = function(e) {
+		switch (e.button) {
+			case 0:
+				Key.leftMouse = false;
+				break;
+			case 1:
+				Key.middleMouse = false;
+				break;
+			case 2:
+				Key.rightMouse = false;
+				break;
+		}
+	};
+	document.onkeydown = function(e) {
+		if (e.repeat || Key[e.key.toLowerCase()]) {
+			return;
+		}
+		let k = e.key.toLowerCase();
+		Key[k] = true;
+		if (k === "delete") {
+			initEverything();
+			releasePointer();
+		}
+		if (k === "t") {
+			initTextures();
+		}
+		if (k === "enter") {
+			blockMode ^= 1;
+			updateHUD = true;
+		}
+		if (screen === "play") {
+			if (k === "p") {
+				releasePointer();
+				screen = "pause";
+				message.hidden = false;
+			}
+			if (k === "b") {
+				p.autoBreak = !p.autoBreak;
+				updateHUD = true;
+			}
+			if (k === " ") {
+				if (Date.now() < p.lastJump + 400) {
+					//p.flying ^= true;
+				} else {
+					p.lastJump = Date.now();
+				}
+			}
+			if (k === "z") {
+				FOV(10);
+			}
+			if (k === "shift" && !p.flying) {
+				p.sneaking = true;
+				p.sprinting = false;
+				p.speed = 0.03;
+				p.bottomH = 1.32;
+			}
+			if (k === "e") {
+				//screen = "inventory";
+				//releasePointer();
+				//let reach = 5;// idk why
+			}
+			if (k === ";") {
+				releasePointer();
+				freezeFrame = true;
+			}
+			if (Number(k)) {
+				inventory.hotbarSlot = Number(k) - 1;
+				holding = inventory.hotbar[inventory.hotbarSlot];
+				updateHUD = true;
+			}
+		} else if (screen === "pause") {
+			if (k === "p") {
+				play();
+			}
+		} else if (screen === "inventory") {
+			if (k === "e") {
+				play();
+			}
+		}
+	};
+	document.onkeyup = function(e) {
+		let k = e.key.toLowerCase();
+		Key[k] = false;
+		if (k === "escape" && (screen.includes("pause") || screen === "inventory") && Date.now() > unpauseDelay) {
+			play();
+		}
+		if (screen === "play") {
+			if (k === "z") {
+				FOV(fov);
+			}
+			if (k === "shift" && p.sneaking) {
+				p.sneaking = false;
+				p.speed = 0.075;
+				p.bottomH = 1.62;
+				// p.y += 0.3;
+			}
+		}
+	};
+	canvas.onblur = function() {
+		for (let key in Key) {
+			Key[key] = false;
+		}
+	}
+	canvas.oncontextmenu = function(e) {
+		e.preventDefault();
+	}
+
+	function initEverything() {
+		console.log("Initializing world.");
+		worldSeed = 0;
+		seedHash(worldSeed);
+		generatedChunks = 0;
+		screen = "main menu";
+		p = {
+			speed: 0.075,
+			velocity: new PVector(0, 0, 0),
+			direction: new PVector(0, 0, 0),
+			sprintSpeed: 1.5,
+			flySpeed: 2.5,
+			x: 8,
+			y: 6,
+			z: 8,
+			previousX: 8,
+			previousY: 70,
+			previousZ: 8,
+			w: 3 / 8,
+			bottomH: 1.62,
+			topH: 0.18,
+			rx: 0.5 / 2,
+			ry: 3.5,
+			onGround: false,
+			jumpSpeed: 0.3,
+			sprinting: false,
+			maxYVelocity: 1.5,
+			gravityStength: -0.032,
+			lastUpdate: win.performance.now(),
+			lastBreak: Date.now(),
+			lastPlace: Date.now(),
+			lastJump: Date.now(),
+			autoBreak: false,
+			flying: false,
+			sneaking: false,
+			frustum: [],
+		};
+		p.lastCheckpointX = p.x;
+		p.lastCheckpointY = p.y;
+		p.lastCheckpointZ = p.z;
+		for (let i = 0; i < 4; i++) {
+			p.frustum[i] = new Plane();
+		}
+		win.player = p;
+		win.p2 = p2;
+		if (!win.gl) {
+			let canv = document.createElement('canvas');
+			canv.width = ctx.canvas.width;
+			canv.height = ctx.canvas.height;
+			canv.style.position = "absolute";
+			canv.style.zIndex = -1;
+			canv.style.top = "0px";
+			canv.style.left = "0px";
+			// var ctxNames = ['experimental-webgl', 'webgl', 'webkit-3d'];
+			// for (var i=0, l=ctxNames.length; i<l; i++) {
+			//	 gl = canv.getContext(ctxNames[i], {antialias: false});
+			//	 if (gl) {
+			//		 break;
+			//	 }
+			// }
+			gl = canv.getContext("webgl", {
+				preserveDrawingBuffer: true,
+				antialias: false,
+				premultipliedAlpha: false
+			});
+			let ext = gl.getExtension('OES_element_index_uint');
+			if (!ext) {
+				alert("Please use a supported browser, or update your current browser.")
+			}
+			gl.viewport(0, 0, canv.width, canv.height);
+			gl.enable(gl.DEPTH_TEST);
+			gl.enable(gl.BLEND);
+			gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+			win.gl = gl;
+		} else {
+			gl = win.gl;
+		}
+		if (!document.body.contains(gl.canvas)) {
+			document.body.append(gl.canvas);
+		}
+		modelView = newFloat32Array(16);
+		glCache = {
+			attributes: {},
+			locations: {}
+		};
+		programObject3D = createProgramObject(gl, vertexShaderSrc3D, fragmentShaderSrc3D);
+		gl.useProgram(programObject3D);
+		glCache.locations.uEdge = gl.getUniformLocation(programObject3D, "uEdge");
+		glCache.locations.uSampler = gl.getUniformLocation(programObject3D, "uSampler");
+		glCache.locations.aShadow = gl.getAttribLocation(programObject3D, "aShadow");
+		//Send the block textures to the GPU
+		initTextures();
+		initShapes();
+		sideEdgeBuffers = {};
+		for (let side in shapes.cube.verts) {
+			let edgeBuffer = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER, edgeBuffer);
+			gl.bufferData(gl.ARRAY_BUFFER, newFloat32Array(shapes.cube.verts[side][0]), gl.STATIC_DRAW);
+			sideEdgeBuffers[side] = edgeBuffer;
+		}
+		texCoordsBuffers = [];
+		for (let t in textureCoords) {
+			let buff = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER, buff);
+			gl.bufferData(gl.ARRAY_BUFFER, textureCoords[t], gl.STATIC_DRAW);
+			texCoordsBuffers.push(buff);
+		}
+		//Bind the Vertex Array Object (VAO) that will be used to draw everything
+		indexBuffer = gl.createBuffer();
+		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+		gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexOrder, gl.STATIC_DRAW);
+		//Tell it not to render the insides of blocks
+		gl.enable(gl.CULL_FACE);
+		gl.cullFace(gl.BACK);
+		gl.disableVertexAttribArray(glCache.locations.aShadow);
+		gl.vertexAttrib1f(glCache.locations.aShadow, 1.0);
+		gl.lineWidth(2);
+		blockOutlines = false;
+		gl.enable(gl.POLYGON_OFFSET_FILL);
+		gl.polygonOffset(1, 1);
+		gl.clearColor(0, 0, 0, 1.0);
+		gl.clear(gl.DEPTH_BUFFER_BIT | gl.COLOR_BUFFER_BIT);
+		FOV(60);
+		let HALF_PI = Math.PI / 2;
+		initModelView(0, 0, 0, -HALF_PI / 6, -HALF_PI / 2.5);
+		block2(1, -1, 5, 27);
+		block2(2, -1, 5, 24);
+		block2(3, -2, 4, 24);
+		block2(3, -2, 5, 27);
+		block2(2, -2, 4, 24);
+		block2(1, -2, 4, 24);
+		block2(0, -3, 4, 24);
+		block2(1, -3, 4, 24);
+		block2(1, -4, 3, 27);
+		block2(2, -3, 3, 24);
+		block2(3, -2, 3, 24);
+		block2(3, -3, 2, 24);
+		block2(5, -3, 2, 27);
+		block2(4, -4, 1, 24);
+		block2(4, -3, 2, 27);
+		block2(0, -2, 5, 24);
+		block2(4, -2, 3, 24);
+		block2(4, -2, 4, 27);
+		block2(5, -3, 3, 24);
+		//ctx.drawImage(gl.canvas, 0, 0);
+		FOV(fov);
+	}
+	let debugMenu = false;
+
+	function gameLoop() {
+		let frameStart = win.performance.now();
+		if (!screen) {
+			initEverything();
+			releasePointer();
+		}
+		if (screen.includes("menu")) {
+			let title = "KhanCraft";
+			let subtext = "P A R K O U R   M O D"
+			cursor(ARROW);
+			strokeWeight(1);
+			ctx.clearRect(0, 0, width, height);
+			ctx.textAlign = 'center';
+			ctx.font = "bold 150px VT323";
+			fill(30);
+			text(title, width / 2, 158);
+			fill(40);
+			text(title, width / 2, 155);
+			ctx.font = "bold 151px VT323";
+			fill(50);
+			text(title, width / 2, 152);
+			fill(70);
+			text(title, width / 2, 150);
+			fill(90);
+			ctx.font = "bold 152px VT323";
+			text(title, width / 2, 148);
+			fill(110);
+			text(title, width / 2, 145);
+			ctx.font = "bold 31.5px VT323";
+			fill(30);
+			text(subtext, width / 2, 200);
+			fill(40);
+			text(subtext, width / 2, 198.5);
+			fill(50);
+			text(subtext, width / 2, 197);
+			ctx.font = "bold 31.65px VT323";
+			fill(70);
+			text(subtext, width / 2, 195.5);
+			fill(90);
+			text(subtext, width / 2, 194);
+			fill(110);
+			text(subtext, width / 2, 192.5);
+			if (screen === "main menu") {
+				fill(220);
+				ctx.font = "20px VT323";
+				ctx.textAlign = 'left';
+				text("Minecraft " + version, width - (width - 2), height - 2);
+			}
+		} else if (screen === "play") {
+			controls();
+			runGravity();
+			resolveContactsAndUpdatePosition();
+				ctx.clearRect(0, 0, canvas.width, canvas.height);
+				gl.clearColor(0.0, 0.0, 0.0, 0.0);
+				gl.clear(gl.DEPTH_BUFFER_BIT | gl.COLOR_BUFFER_BIT);
+				hotbar();
+				ctx.drawImage(gl.canvas, 0, 0);
+				updateHUD = false;
+				freezeFrame = false;
+				gl.clearColor(84 / 255, 138 / 255, 184 / 255, 1.0);
+				hud();
+			defineWorld(); // Load, draw, and update the world
+			gl.flush();
+			gl.finish();
+		} else if (screen.includes("pause")) {
+			cursor(ARROW);
+			strokeWeight(1);
+			ctx.clearRect(0, 0, canvas.width, canvas.height);
+			ctx.drawImage(gl.canvas, 0, 0);
+			textSize(60);
+			fill(0, 0, 0);
+			ctx.textAlign = 'center';
+			text("Paused", width / 2, 60);
+			if (screen === "pause options") {
+				ctx.beginPath();
+				ctx.beginPath();
+			}
+		}
+		buttons.forEach(drawButton);
+		if (Date.now() - analytics.lastUpdate > 500 && analytics.frames) {
+			analytics.displayedTickTime = (analytics.totalTickTime / analytics.frames).toFixed(1);
+			analytics.displayedRenderTime = (analytics.totalRenderTime / analytics.frames).toFixed(1);
+			analytics.displayedFrameTime = (analytics.totalFrameTime / analytics.frames).toFixed(1);
+			analytics.fps = Math.round(analytics.frames * 1000 / (Date.now() - analytics.lastUpdate));
+			analytics.displayedwFrameTime = analytics.worstFrameTime.toFixed(1);
+			analytics.frames = 0;
+			analytics.totalRenderTime = 0;
+			analytics.totalTickTime = 0;
+			analytics.totalFrameTime = 0;
+			analytics.worstFrameTime = 0;
+			analytics.lastUpdate = Date.now();
+			updateHUD = true;
+		}
+		analytics.frames++;
+		analytics.totalFrameTime += win.performance.now() - frameStart;
+		analytics.worstFrameTime = Math.max(win.performance.now() - frameStart, analytics.worstFrameTime);
+		win.raf = requestAnimationFrame(gameLoop);
+	}
+	return gameLoop;
+}
+init = MineKhan();
+if (window.parent.raf) {
+	window.cancelAnimationFrame(window.parent.raf);
+	console.log("Canceled", window.parent.raf)
+}
+init();
+
+	</script>
+</html>

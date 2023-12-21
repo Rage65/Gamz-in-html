@@ -1,0 +1,57 @@
+﻿<!DOCTYPE html>
+<html>
+  <head>
+    <title>2D World</title>
+    <style>
+      /* Define the size of each cell in the world */
+      .cell {
+        width: 100px;
+        height: 10px;
+      }
+
+
+      /* Define the colors of the cells */
+      .empty {
+        background-color: blue;
+      }
+      .filled {
+        background-color: green;
+      }
+    </style>
+  </head>
+  <body>
+    <script>
+      // Define the size of the world
+      const NUM_ROWS = 60000;
+      const NUM_COLS = 80000;
+
+
+      // Create a 2D array to represent the world
+      let world = new Array(NUM_ROWS);
+      for (let row = 0; row < NUM_ROWS; row++) {
+        world[row] = new Array(NUM_COLS);
+        for (let col = 0; col < NUM_COLS; col++) {
+          world[row][col] = Math.round(Math.random());
+        }
+      }
+
+
+      // Draw the world on the page
+      let worldDiv = document.createElement('div');
+      worldDiv.setAttribute('id', 'world');
+      for (let row = 0; row < NUM_ROWS; row++) {
+        for (let col = 0; col < NUM_COLS; col++) {
+          let cell = document.createElement('div');
+          cell.setAttribute('class', 'cell');
+          if (world[row][col] === 1) {
+            cell.setAttribute('class', 'cell filled');
+          } else {
+            cell.setAttribute('class', 'cell empty');
+          }
+          worldDiv.appendChild(cell);
+        }
+      }
+      document.body.appendChild(worldDiv);
+    </script>
+  </body>
+</html>

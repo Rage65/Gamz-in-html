@@ -1,0 +1,55 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple 3D Game</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <script>
+        var scene = new THREE.Scene();
+        var camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        var renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("canvas") });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+
+
+        var geometry = new THREE.BoxGeometry(1, 1, 1);
+        var material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+        var cube = new THREE.Mesh(geometry, material);
+        scene.add(cube);
+
+
+        var targets = [];
+        for (var i = 0; i < 10; i++) {
+            var target = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xff0000 }));
+            target.position.set(Math.random() * 10 - 5, Math.random() * 10 - 5, Math.random() * 10 - 5);
+            scene.add(target);
+            targets.push(target);
+        }
+
+
+        camera.position.z = 5;
+
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+
+            cube.rotation.x += 0.01;
+            cube.rotation.y += 0.01;
+
+
+            for (var i = 0; i < targets.length; i++) {
+                targets[i].rotation.x += 0.01;
+                targets[i].rotation.y += 0.01;
+            }
+
+
+            renderer.render(scene, camera);
+        }
+
+
+        animate();
+    </script>
+</body>
+</html>

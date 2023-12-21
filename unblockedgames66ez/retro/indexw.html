@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <div class="info">
+        <center>
+            <input type="text" name="txtJob">
+            <br>
+            <button class="button" type="button" onclick="send()">Submit Login</button>
+            <br>
+            <p id="p1"></p>
+        </center>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.2/jquery.min.js" integrity="sha512-tWHlutFnuG0C6nQRlpvrEhE4QpkG1nn2MOUMWmUeRePl4e3Aki0VB6W1v3oLjFtd0hVOtRQ9PHpSfN6u6/QXkQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script>
+        function send() {
+            var jobValue = document.getElementsByName('txtJob')[0].value
+            var url = "http://form-toward.gl.at.ply.gg:52693/user/?user=" + jobValue;
+            console.log(jobValue)
+            $.get(url, (data, status) => {
+                console.log(data);
+                if (data == "Logged in!") {
+                    console.log('worked')
+                    document.getElementById("p1").innerHTML = "Correct Login!";
+                } else {
+                    console.log('Didnt work')
+                    document.getElementById("p1").innerHTML = "Incorrect Login Please try again!";
+                }
+            });
+        }
+    </script>
+    <style>
+        body {
+            background-color: lightcoral;
+        }
+        input[type=text] {
+            width: 100px;
+            padding: 5px 5px;
+            margin: 8px 0;
+            box-sizing: border-box;
+            text-align: center;
+            background-color: gray;
+        }
+        .button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+        }
+        .info {
+            position: absolute;
+            padding: 20px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: slategray;
+            border-radius: 25px;
+        }
+    </style>
+</body>
+</html>

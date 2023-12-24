@@ -1,4 +1,4 @@
-# List of tested games and bugs
+# List of tested games and bugs for snes emu
 This is a list of all the games that I have tested and it notes the bugs for each one.
 
 The following games seem to run without any obvious CPU/PPU bugs within the first few minutes of gameplay (and audio also seems to work properly, except for the echo, but is not really checked).
